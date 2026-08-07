@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://matverse.local/schemas/interaction-intent-v1.json",
+  "title": "URANO InteractionIntent v1",
+  "type": "object",
+  "required": ["schema_version", "intent_id", "intent", "actor", "input_modality", "timestamp"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "intent_id": {"type": "string"},
+    "intent": {"enum": ["SELECT", "INSPECT", "TRANSDUCE", "CONFIRM", "EXECUTE", "CANCEL", "MOVE", "FOCUS"]},
+    "target": {"type": ["string", "null"]},
+    "actor": {"type": "string"},
+    "input_modality": {"enum": ["MOUSE", "TOUCH", "HAND", "GAZE", "VOICE", "CONTROLLER", "KEYBOARD", "SYSTEM"]},
+    "timestamp": {"type": "string"},
+    "payload": {"type": "object"}
+  },
+  "additionalProperties": false
+}
