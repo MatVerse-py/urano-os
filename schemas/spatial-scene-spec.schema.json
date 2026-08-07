@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://matverse.local/schemas/spatial-scene-spec-v1.json",
+  "title": "URANO SpatialSceneSpec v1",
+  "type": "object",
+  "required": ["schema_version", "scene_id", "source_state_hash", "mode", "epistemic_class", "organism", "entities", "relations", "anchors", "interactions", "renderer_policy"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "scene_id": {"type": "string", "minLength": 1},
+    "source_state_hash": {"type": "string", "minLength": 1},
+    "mode": {"enum": ["FOCUS", "PRESENCE", "ANALYSIS", "DREAM", "LAB", "RITUAL"]},
+    "epistemic_class": {"enum": ["STATE_VISUALIZATION", "SEMANTIC_MAP", "SPECULATIVE_DREAM", "OBSERVED_RESULT", "GENERATIVE_METAPHOR"]},
+    "organism": {
+      "type": "object",
+      "required": ["state", "morphology", "whirl"],
+      "properties": {
+        "state": {"type": "string"},
+        "morphology": {"type": "number", "minimum": 0, "maximum": 1},
+        "whirl": {
+          "type": "object",
+          "required": ["velocity", "turbulence", "convergence"],
+          "properties": {
+            "velocity": {"type": "number", "minimum": 0, "maximum": 1},
+            "turbulence": {"type": "number", "minimum": 0, "maximum": 1},
+            "convergence": {"type": "number", "minimum": 0, "maximum": 1}
+          }
+        }
+      }
+    },
+    "entities": {"type": "array", "items": {"type": "object"}},
+    "relations": {"type": "array", "items": {"type": "object"}},
+    "anchors": {"type": "array", "items": {"type": "object"}},
+    "interactions": {"type": "array", "items": {"type": "object"}},
+    "renderer_policy": {
+      "type": "object",
+      "required": ["deterministic", "seed"],
+      "properties": {
+        "deterministic": {"type": "boolean"},
+        "seed": {"type": "integer"}
+      }
+    }
+  },
+  "additionalProperties": true
+}

@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://matverse.local/schemas/research-state-v1.json",
+  "title": "URANO ResearchState v1",
+  "type": "object",
+  "required": ["schema_version", "investigation_id", "revision", "epistemic_state", "claims", "hypotheses", "evidence", "experiments", "capabilities", "notebook", "lineage"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "investigation_id": {"type": "string", "minLength": 1},
+    "revision": {"type": "integer", "minimum": 0},
+    "epistemic_state": {"enum": ["SPECIFIED", "IMPLEMENTED", "EXECUTED", "OBSERVED", "SUPPORTED", "CONTRADICTED", "RETRACTED", "UNKNOWN"]},
+    "claims": {"type": "array", "items": {"type": "object"}},
+    "hypotheses": {"type": "array", "items": {"type": "object"}},
+    "evidence": {"type": "array", "items": {"type": "object"}},
+    "experiments": {"type": "array", "items": {"type": "object"}},
+    "capabilities": {"type": "array", "items": {"type": "object"}},
+    "notebook": {"type": "array", "items": {"type": "object"}},
+    "lineage": {"type": "array", "items": {"type": "object"}},
+    "updated_at": {"type": "string"}
+  },
+  "additionalProperties": true
+}

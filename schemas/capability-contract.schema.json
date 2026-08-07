@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://matverse.local/schemas/capability-contract-v1.json",
+  "title": "URANO Capability/Peripheral Contract v1",
+  "type": "object",
+  "required": ["schema_version", "id", "provider", "adapter", "protocol", "operations", "permissions", "locality", "privacy", "destructive", "confirmation_required", "status"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "id": {"type": "string"},
+    "provider": {"type": "string"},
+    "adapter": {"type": "string"},
+    "protocol": {"enum": ["API", "MCP", "LOCAL_BRIDGE", "DRIVER", "FILESYSTEM", "OTHER"]},
+    "operations": {"type": "array", "items": {"type": "string"}},
+    "permissions": {"type": "array", "items": {"enum": ["READ", "COMPUTE", "WRITE", "PUBLISH", "ACTUATE", "DESTRUCTIVE"]}},
+    "locality": {"enum": ["LOCAL", "PRIVATE", "PUBLIC_API"]},
+    "privacy": {"type": "object"},
+    "destructive": {"type": "boolean"},
+    "confirmation_required": {"type": "boolean"},
+    "evidence_policy": {"type": "string"},
+    "status": {"enum": ["DECLARED", "DISCOVERED", "AVAILABLE", "CONNECTED", "ACTIVE", "HOLD", "BLOCKED", "ERROR", "UNKNOWN", "DISCONNECTED"]},
+    "health": {"type": "object"}
+  },
+  "additionalProperties": true
+}
