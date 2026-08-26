@@ -90,6 +90,34 @@
     toggleRow.appendChild(rotateBtn);
     wrap.appendChild(toggleRow);
 
+    // kernel bridge panel — the one real (non-simulated) traversal
+    var kernelPanel = el("div", "panel kernel-panel");
+    var kernelHead = el("div", "kernel-head");
+    var kernelStatus = el("span", "pill state-hold", "KERNEL · checking…");
+    kernelHead.appendChild(el("h2", null, "Kernel Bridge"));
+    kernelHead.appendChild(kernelStatus);
+    kernelPanel.appendChild(kernelHead);
+    kernelPanel.appendChild(
+      el(
+        "p",
+        "view-lede kernel-lede",
+        "Traversal real, não simulada: percorre event_runtime → cassandra_gate → " +
+          "memory_gate (hash-chain) → evidence_pack de src/urano_kernel/ via " +
+          "python3 -m src.urano_kernel.bridge. Offline por padrão."
+      )
+    );
+    var kernelForm = document.createElement("form");
+    kernelForm.className = "cassandra-bar";
+    var kernelInput = document.createElement("input");
+    kernelInput.type = "text";
+    kernelInput.placeholder = "payload de percepção para o kernel real…";
+    var kernelSubmit = el("button", "submit", "Perceive →");
+    kernelSubmit.type = "submit";
+    kernelForm.appendChild(kernelInput);
+    kernelForm.appendChild(kernelSubmit);
+    kernelPanel.appendChild(kernelForm);
+    wrap.appendChild(kernelPanel);
+
     // notebook
     var notebook = el("div", "notebook");
     var notebookHead = el("div", "notebook-head", "Living Notebook");
@@ -110,6 +138,9 @@
       input: input,
       rotateBtn: rotateBtn,
       cellsEl: cellsEl,
+      kernelStatus: kernelStatus,
+      kernelForm: kernelForm,
+      kernelInput: kernelInput,
     };
   }
 
@@ -124,24 +155,36 @@
     );
   }
 
+  var STATUS_CLASS = {
+    candidate_not_executed: "candidate",
+    kernel_real: "kernel-real",
+    kernel_fail: "kernel-fail",
+  };
+
+  var STATUS_FLAG_TEXT = {
+    candidate_not_executed: "candidate_not_executed — not evidence",
+    kernel_real: "OBSERVED_RESULT — real kernel traversal",
+    kernel_fail: "kernel rejected — QUARANTINE/NULL, not appended",
+  };
+
   function appendCell(cellsEl, cell) {
     var empty = cellsEl.querySelector(".notebook-empty");
     if (empty) empty.remove();
 
-    var wrap = el(
-      "div",
-      "cell" + (cell.status === "candidate_not_executed" ? " candidate" : "")
-    );
+    var extraClass = STATUS_CLASS[cell.status] || "";
+    var wrap = el("div", "cell" + (extraClass ? " " + extraClass : ""));
     var badge = el("div", "cell-badge", cell.type.toUpperCase());
     var body = el("div", "cell-body");
     var text = el("div", "cell-text", cell.text);
     var meta = el("div", "cell-meta mono");
     meta.appendChild(el("span", null, cell.epistemicClass));
     meta.appendChild(el("span", null, cell.mode));
-    if (cell.status === "candidate_not_executed") {
-      meta.appendChild(
-        el("span", "flag-candidate", "candidate_not_executed — not evidence")
-      );
+    var flagText = STATUS_FLAG_TEXT[cell.status];
+    if (flagText) {
+      meta.appendChild(el("span", "flag-candidate", flagText));
+    }
+    if (cell.receiptHash) {
+      meta.appendChild(el("span", null, "receipt:" + cell.receiptHash.slice(0, 12)));
     }
     body.appendChild(text);
     body.appendChild(meta);

@@ -24,5 +24,15 @@ detalhamento completo e a distinção de linhagem.
 python3 -m src.urano_kernel.kernel
 ```
 
+Para abrir a superfície OSX com uma traversal real (não simulada) no kernel:
+```bash
+python3 -m src.urano_kernel.bridge
+# depois: http://localhost:8765/urano/URANO%20OSX.html
+```
+`urano/URANO OSX.html` também abre direto por `file://` — nesse caso o
+painel "Kernel Bridge" reporta `KERNEL · offline` honestamente, e o resto
+da interface (Cubo, campo generativo, ScientificObject v1, Organism Mesh)
+funciona normalmente como demonstração client-side.
+
 ---
 *URANO OS: Evento → Memória → Decisão → Prova → Replay*

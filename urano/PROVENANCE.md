@@ -51,6 +51,41 @@ this tree wholesale and this document should be updated to say so — this
 reconstruction should not be quietly merged with recovered bytes and
 presented as continuous history.
 
+## Kernel Bridge (one real traversal, not simulation)
+
+`src/urano_kernel/bridge.py` is a new, additive file — it does not modify
+any existing kernel module. It exposes the *existing* `perception`/`action`
+event paths of `UranoKernel` over a local HTTP API and serves this repo as
+static files, so the OSX Surface's "Kernel Bridge" panel can perform one
+real traversal end to end:
+
+```
+OSX intent input
+  -> POST /api/perceive
+  -> EventRuntime.emit("perception", payload)
+  -> CassandraGate.perceive()          (real validation)
+  -> MemoryGate.append()               (real sha256 hash-chain entry)
+  -> EvidencePack.add()                (real evidence record)
+  -> receipt hash returned to the browser
+  -> Cube pulses, Living Notebook records a real (OBSERVED_RESULT) cell
+```
+
+Run it from the repo root:
+
+```
+python3 -m src.urano_kernel.bridge
+# then open http://localhost:8765/urano/URANO%20OSX.html
+```
+
+Opening `URANO OSX.html` directly (`file://`) still works for everything
+except this panel, which will honestly report `KERNEL · offline`.
+
+This bridge does **not** implement an Ω-Gate, authority/authorization
+layer, or an Organism/Organs/Tools/Skills model — those remain design
+proposals, not code. It exposes exactly the `perceive`/`act` paths that
+already existed in `kernel.py`, nothing more. Do not read its presence as
+those larger structures being built.
+
 ## Sample data disclosure
 
 Views in this build (claim dependency graph, negative results, publication

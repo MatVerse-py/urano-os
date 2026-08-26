@@ -159,6 +159,30 @@
   font-family: var(--font-mono);
 }
 
+.kernel-panel { padding: 12px 14px; }
+
+.kernel-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.kernel-head h2 { margin: 0; }
+
+.kernel-lede { margin: 0 0 10px; font-size: 11.5px; }
+
+@keyframes cube-kernel-pulse {
+  0% { filter: none; }
+  30% { filter: drop-shadow(0 0 6px var(--ok)); }
+  100% { filter: none; }
+}
+
+.cube.kernel-pulse .cube-face { animation: cube-kernel-pulse 900ms ease-out; }
+
+.cell.kernel-real .cell-badge { color: var(--ok); border-color: var(--ok); }
+.cell.kernel-fail .cell-badge { color: var(--bad); border-color: var(--bad); }
+
 .notebook {
   border: 1px solid var(--line);
   border-radius: var(--radius);

@@ -94,6 +94,99 @@
       viewsOSX.appendCell(refs.cellsEl, cell);
     });
 
+    // kernel bridge — the one real (non-simulated) traversal into
+    // src/urano_kernel/ via `python3 -m src.urano_kernel.bridge`.
+    // Offline by default; never fabricates a receipt if unreachable.
+    var KERNEL_BASE = global.location.origin.startsWith("http")
+      ? global.location.origin
+      : "http://localhost:8765";
+    var kernelOnline = false;
+
+    function setKernelStatus(text, cls) {
+      refs.kernelStatus.textContent = "KERNEL · " + text;
+      refs.kernelStatus.className = "pill " + cls;
+    }
+
+    function pollKernelState() {
+      fetch(KERNEL_BASE + "/api/state")
+        .then(function (r) {
+          if (!r.ok) throw new Error("bad status");
+          return r.json();
+        })
+        .then(function (data) {
+          kernelOnline = true;
+          setKernelStatus(
+            "online · chain " + data.state.chain_length,
+            "state-ok"
+          );
+        })
+        .catch(function () {
+          kernelOnline = false;
+          setKernelStatus("offline", "state-hold");
+        });
+    }
+    pollKernelState();
+    var kernelPollId = global.setInterval(pollKernelState, 5000);
+
+    refs.kernelForm.addEventListener("submit", function (ev) {
+      ev.preventDefault();
+      var text = refs.kernelInput.value.trim();
+      if (!text) return;
+      refs.kernelInput.disabled = true;
+
+      fetch(KERNEL_BASE + "/api/perceive", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ payload: text }),
+      })
+        .then(function (r) {
+          return r.json();
+        })
+        .then(function (data) {
+          var ok = data.ok && data.memory_appended;
+          var cell = {
+            type: "kernel",
+            text:
+              'Kernel real: "' +
+              text +
+              '" → ' +
+              data.result +
+              (ok ? "" : " (não anexado à hash-chain)"),
+            epistemicClass: ok ? "OBSERVED_RESULT" : "STATE_VISUALIZATION",
+            mode: spec.mode,
+            status: ok ? "kernel_real" : "kernel_fail",
+            receiptHash: data.receipt_hash,
+          };
+          cells.push(cell);
+          viewsOSX.appendCell(refs.cellsEl, cell);
+          if (ok) {
+            cube.pulse();
+            refs.epistemicChip.textContent = "OBSERVED_RESULT";
+            refs.epistemicChip.dataset.class = "OBSERVED_RESULT";
+            global.setTimeout(function () {
+              refs.epistemicChip.textContent = spec.epistemicClass;
+              refs.epistemicChip.dataset.class = spec.epistemicClass;
+            }, 1400);
+          }
+          pollKernelState();
+        })
+        .catch(function () {
+          var cell = {
+            type: "kernel",
+            text: 'Kernel real: "' + text + '" → bridge unreachable (offline)',
+            epistemicClass: "STATE_VISUALIZATION",
+            mode: spec.mode,
+            status: "kernel_fail",
+          };
+          cells.push(cell);
+          viewsOSX.appendCell(refs.cellsEl, cell);
+        })
+        .finally(function () {
+          refs.kernelInput.disabled = false;
+          refs.kernelInput.value = "";
+        });
+    });
+
     // animation loop
     var lastT = performance.now();
     var raf;
@@ -110,6 +203,7 @@
     return {
       unmount: function () {
         if (raf) cancelAnimationFrame(raf);
+        global.clearInterval(kernelPollId);
       },
     };
   }

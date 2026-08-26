@@ -112,6 +112,12 @@
         var facing = apply();
         return facing ? FACE_LABELS[facing] : FACE_LABELS.front;
       },
+      pulse: function () {
+        rootEl.classList.remove("kernel-pulse");
+        // eslint-disable-next-line no-unused-expressions
+        rootEl.offsetWidth; // restart CSS animation
+        rootEl.classList.add("kernel-pulse");
+      },
     };
   }
 

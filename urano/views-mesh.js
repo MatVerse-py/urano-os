@@ -26,6 +26,7 @@
     "Living Notebook — continuidade causal da investigação",
     "Cube — identidade topológica persistente",
     "Visualization — field + claim-graph renderers (viz.js)",
+    "Kernel Bridge — HTTP real para src/urano_kernel/ (bridge.py)",
   ];
 
   var STATUS_ROWS = [
@@ -35,6 +36,9 @@
     ["DESIGNSYNC_IMPORT", "BLOCKED_BY_INTERACTIVE_AUTH", "state-bad"],
     ["CLAUDE_DESIGN_SOURCE", "NOT_AVAILABLE_IN_WORKSPACE", "state-bad"],
     ["FRONTEND_RECONSTRUCTION_FROM_PROSE", "DECLARED_NOT_ORIGINAL", "state-warn"],
+    ["OSX_KERNEL_BRIDGE", "LOCAL_HTTP_PROTOTYPE — perceive/act only", "state-warn"],
+    ["ORGANISM / ORGANS / TOOLS / SKILLS", "HOLD — not modeled yet", "state-bad"],
+    ["Ω-GATE / AUTHORITY LAYER", "HOLD — not implemented", "state-bad"],
   ];
 
   function el(tag, cls, text) {
