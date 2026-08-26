@@ -1,0 +1,404 @@
+/* URANO OSX — view-specific layout
+   Clean-room reconstruction — see PROVENANCE.md */
+
+/* ================= OSX SURFACE ================= */
+
+.osx-surface { display: flex; flex-direction: column; gap: 14px; }
+
+.mode-bar { display: flex; gap: 6px; flex-wrap: wrap; }
+
+.mode-btn {
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  padding: 5px 10px;
+  color: var(--ink-dim);
+}
+
+.mode-btn:hover { border-color: var(--ink-faint); color: var(--ink); }
+
+.mode-btn.active {
+  background: var(--ink);
+  color: var(--bg);
+  border-color: var(--ink);
+}
+
+.field-stage {
+  position: relative;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-sunken);
+  height: min(52vh, 460px);
+  overflow: hidden;
+}
+
+.field-stage canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+}
+
+.cube-stage {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  perspective: 900px;
+  pointer-events: none;
+}
+
+.cube {
+  --half: 42px;
+  --rx: -18deg;
+  --ry: 28deg;
+  width: 84px;
+  height: 84px;
+  position: relative;
+  transform-style: preserve-3d;
+  transform: rotateX(var(--rx)) rotateY(var(--ry));
+}
+
+.cube-face {
+  position: absolute;
+  inset: 0;
+  border: 1px solid var(--line-strong);
+  background: color-mix(in srgb, var(--bg-panel) 82%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 7.5px;
+  letter-spacing: 0.05em;
+  color: var(--ink);
+  text-align: center;
+  padding: 4px;
+  transition: border-radius 0.4s ease;
+}
+
+.cube-face.face-front  { transform: rotateY(0deg)    translateZ(var(--half)); }
+.cube-face.face-back   { transform: rotateY(180deg)  translateZ(var(--half)); }
+.cube-face.face-right  { transform: rotateY(90deg)   translateZ(var(--half)); }
+.cube-face.face-left   { transform: rotateY(-90deg)  translateZ(var(--half)); }
+.cube-face.face-top    { transform: rotateX(90deg)   translateZ(var(--half)); }
+.cube-face.face-bottom { transform: rotateX(-90deg)  translateZ(var(--half)); }
+
+.field-readout {
+  position: absolute;
+  left: 10px;
+  bottom: 8px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-dim);
+  background: color-mix(in srgb, var(--bg-panel) 78%, transparent);
+  padding: 3px 7px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  pointer-events: none;
+}
+
+.field-legend {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  display: flex;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.epistemic-chip {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  padding: 2px 7px;
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--bg-panel) 85%, transparent);
+  color: var(--ink-dim);
+  border: 1px solid var(--line);
+}
+
+.epistemic-chip[data-class="OBSERVED_RESULT"],
+.epistemic-chip[data-class="STATE_VISUALIZATION"] { border-style: solid; }
+.epistemic-chip[data-class="SEMANTIC_MAP"] { border-style: solid; border-width: 1px 1px 1px 3px; }
+.epistemic-chip[data-class="SPECULATIVE_DREAM"] { border-style: dashed; }
+.epistemic-chip[data-class="GENERATIVE_METAPHOR"] { border-style: dotted; }
+
+.cassandra-bar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.cassandra-bar input[type="text"] {
+  flex: 1;
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  font-size: 13px;
+  color: var(--ink);
+  font-family: var(--font-ui);
+}
+
+.cassandra-bar input[type="text"]:focus {
+  outline: none;
+  border-color: var(--ink-faint);
+}
+
+.cassandra-bar button.submit {
+  background: var(--ink);
+  color: var(--bg);
+  border: 1px solid var(--ink);
+  border-radius: var(--radius);
+  padding: 8px 14px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+}
+
+.kernel-panel { padding: 12px 14px; }
+
+.kernel-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.kernel-head h2 { margin: 0; }
+
+.kernel-lede { margin: 0 0 10px; font-size: 11.5px; }
+
+@keyframes cube-kernel-pulse {
+  0% { filter: none; }
+  30% { filter: drop-shadow(0 0 6px var(--ok)); }
+  100% { filter: none; }
+}
+
+.cube.kernel-pulse .cube-face { animation: cube-kernel-pulse 900ms ease-out; }
+
+.cell.kernel-real .cell-badge { color: var(--ok); border-color: var(--ok); }
+.cell.kernel-fail .cell-badge { color: var(--bad); border-color: var(--bad); }
+
+.notebook {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+}
+
+.notebook .notebook-head {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-faint);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.notebook-cells {
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.cell {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  gap: 10px;
+}
+
+.cell:last-child { border-bottom: 0; }
+
+.cell .cell-badge {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  padding: 2px 6px;
+  height: fit-content;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  color: var(--ink-dim);
+  white-space: nowrap;
+}
+
+.cell .cell-body { flex: 1; min-width: 0; }
+
+.cell .cell-text { font-size: 12.5px; line-height: 1.45; }
+
+.cell .cell-meta {
+  margin-top: 4px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-faint);
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.cell.candidate .cell-badge { color: var(--warn); border-color: var(--warn); }
+.cell.candidate .cell-meta .flag-candidate { color: var(--warn); }
+
+.notebook-empty {
+  padding: 22px 12px;
+  text-align: center;
+  color: var(--ink-faint);
+  font-size: 12px;
+}
+
+/* ================= SCIENTIFIC OBJECT ================= */
+
+.axes-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.axis-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 10px;
+  background: var(--bg-panel);
+}
+
+.axis-card h3 {
+  margin: 0 0 8px;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
+}
+
+.axis-states { display: flex; flex-direction: column; gap: 3px; }
+
+.axis-state {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-faint);
+  padding: 2px 5px;
+  border-left: 2px solid transparent;
+}
+
+.axis-state.current {
+  color: var(--ink);
+  border-left-color: var(--ink);
+  background: var(--bg-sunken);
+  font-weight: 600;
+}
+
+.claim-graph-wrap { position: relative; }
+
+.claim-graph-wrap svg { width: 100%; height: 260px; display: block; }
+
+.claim-node circle { fill: var(--bg-panel); stroke: var(--line-strong); stroke-width: 1.4; }
+.claim-node text { font-family: var(--font-mono); font-size: 9px; fill: var(--ink); }
+.claim-node.contradicted circle { stroke: var(--bad); fill: color-mix(in srgb, var(--bad) 14%, var(--bg-panel)); }
+.claim-node.review circle { stroke: var(--warn); stroke-dasharray: 3 2; }
+.claim-node.supported circle { stroke: var(--ok); }
+
+.claim-edge { stroke: var(--line); stroke-width: 1.2; fill: none; }
+.claim-pulse { fill: var(--warn); }
+
+.result-cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+
+.result-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 10px;
+  background: var(--bg-panel);
+}
+
+.result-card h4 {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+}
+
+.result-card dl {
+  margin: 0;
+  font-size: 11px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 8px;
+}
+
+.result-card dt { color: var(--ink-faint); font-family: var(--font-mono); font-size: 9.5px; }
+.result-card dd { margin: 0; color: var(--ink-dim); }
+
+.projection-list { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.projection-chip {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 7px 10px;
+  font-size: 11.5px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+pre.json-preview {
+  background: var(--bg-sunken);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px;
+  font-size: 11px;
+  line-height: 1.5;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  color: var(--ink-dim);
+}
+
+/* ================= ORGANISM MESH ================= */
+
+.mesh-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.mesh-box ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mesh-box li {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 6px 9px;
+  color: var(--ink-dim);
+}
+
+.status-table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+
+.status-table td, .status-table th {
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.status-table th {
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.status-table td.key { font-family: var(--font-mono); color: var(--ink-dim); }
+
+@media (max-width: 900px) {
+  .axes-grid { grid-template-columns: repeat(2, 1fr); }
+  .result-cards { grid-template-columns: 1fr; }
+  .mesh-columns { grid-template-columns: 1fr; }
+}

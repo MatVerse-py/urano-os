@@ -11,10 +11,28 @@ O **URANO OS** é um organismo digital verificável, construído sobre os princ�
 ## Dependências
 Este sistema depende fundamentalmente do [urano-digital-life-contract](./contracts), que atua como o cartório de vida digital e registro de twins.
 
+## Frontend (OSX)
+A superfície visual — [`urano/URANO OSX.html`](./urano/URANO%20OSX.html) — é um
+**clean-room reconstruction**: o frontend original (Claude Design) não pôde
+ser recuperado neste ambiente, então esta é uma reimplementação nova,
+compatível com a especificação conhecida, não uma recuperação de bytes
+originais. Ver [`urano/PROVENANCE.md`](./urano/PROVENANCE.md) para o
+detalhamento completo e a distinção de linhagem.
+
 ## Como Executar
 ```bash
 python3 -m src.urano_kernel.kernel
 ```
+
+Para abrir a superfície OSX com uma traversal real (não simulada) no kernel:
+```bash
+python3 -m src.urano_kernel.bridge
+# depois: http://localhost:8765/urano/URANO%20OSX.html
+```
+`urano/URANO OSX.html` também abre direto por `file://` — nesse caso o
+painel "Kernel Bridge" reporta `KERNEL · offline` honestamente, e o resto
+da interface (Cubo, campo generativo, ScientificObject v1, Organism Mesh)
+funciona normalmente como demonstração client-side.
 
 ---
 *URANO OS: Evento → Memória → Decisão → Prova → Replay*
