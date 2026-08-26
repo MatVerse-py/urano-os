@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>URANO OSX</title>
+<!--
+  Clean-room reconstruction — see urano/PROVENANCE.md
+  provenance: original_frontend=unavailable · implementation=clean_room_reconstruction
+  source_basis=design_transcript+specifications · identity=NEW_IMPLEMENTATION
+-->
+<link rel="stylesheet" href="styles.css" />
+<link rel="stylesheet" href="views.css" />
+</head>
+<body>
+
+<header class="osx-header">
+  <span class="title">URANO OSX</span>
+  <span class="subtitle">clean-room reconstruction · vNext</span>
+  <span class="spacer"></span>
+  <span class="badge badge-hold" title="Ver PROVENANCE.md">CLEAN_ROOM_RECONSTRUCTION</span>
+  <button class="icon-btn" id="theme-toggle" type="button">☀ light</button>
+</header>
+
+<div class="shell">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main id="main"></main>
+</div>
+
+<footer class="provenance-strip">
+  <span>original_frontend=unavailable</span>
+  <span>implementation=clean_room_reconstruction</span>
+  <span>identity=NEW_IMPLEMENTATION</span>
+  <a href="PROVENANCE.md">PROVENANCE.md</a>
+</footer>
+
+<script src="viz.js"></script>
+<script src="osx-field.js"></script>
+<script src="views-osx.js"></script>
+<script src="views-science.js"></script>
+<script src="views-mesh.js"></script>
+<script src="actions.js"></script>
+<script src="views.js"></script>
+</body>
+</html>
