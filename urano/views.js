@@ -1,6 +1,6 @@
 /* URANO OSX — views.js
- * Router: mounts one view at a time into #main, builds the grouped
- * sidebar nav, and persists the last-open view for a standalone reload.
+ * Router: mounts one view at a time into #main, builds the grouped sidebar nav,
+ * and persists the last-open view for a standalone reload.
  * Clean-room reconstruction — see PROVENANCE.md
  */
 (function (global) {
@@ -11,6 +11,7 @@
   var VIEWS = [
     { id: "osx-surface", group: "CIÊNCIA", label: "OSX Surface" },
     { id: "scientific-object", group: "CIÊNCIA", label: "ScientificObject v1" },
+    { id: "publication-bridge", group: "CIÊNCIA", label: "Publication Bridge" },
     { id: "organism-mesh", group: "INFRAESTRUTURA", label: "Organism Mesh" },
   ];
 
@@ -36,6 +37,8 @@
       result = OSX.actions.initOSXSurface(refs);
     } else if (id === "scientific-object") {
       result = OSX.viewsScience.mount(mainEl);
+    } else if (id === "publication-bridge") {
+      result = OSX.viewsPublications.mount(mainEl);
     } else if (id === "organism-mesh") {
       OSX.viewsMesh.mount(mainEl);
       result = null;
