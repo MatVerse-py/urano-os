@@ -1,19 +1,9 @@
 """URANO OS Kernel — HTTP bridge (dev-only).
 
-Exposes a single running UranoKernel instance over a minimal local HTTP
-API and serves the repo root as static files, so `urano/URANO OSX.html`
-can perform one real, traceable traversal — intent -> event -> memory
-hash-chain entry -> evidence -> receipt returned to the browser — instead
-of only simulating one client-side.
-
-This file is new and additive. It does not modify kernel.py,
-event_runtime.py, cassandra_gate.py, memory_gate.py, or evidence_pack.py:
-those remain exactly as they were (see urano/PROVENANCE.md).
-
-There is no Ω-Gate / authority layer here — this bridge exposes the
-`perception` and `action` event paths as they exist in the kernel today,
-nothing more. propose -> gate -> authorize -> execute -> receipt is not
-implemented; this is the perceive/act -> receipt slice only.
+Exposes a single running UranoKernel instance over a minimal local HTTP API,
+serves the repo root as static files, and provides a lawful scientific-
+publication resolver that uses metadata/open-access APIs rather than scraping
+or bypassing publisher access controls.
 
 Run from the repo root:
     python3 -m src.urano_kernel.bridge [port]
@@ -31,6 +21,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from .kernel import UranoKernel
+from .publication_resolver import resolve_publication
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -79,11 +70,12 @@ class BridgeHandler(SimpleHTTPRequestHandler):
             return {}
         raw = self.rfile.read(length)
         try:
-            return json.loads(raw.decode("utf-8"))
-        except json.JSONDecodeError:
+            decoded = json.loads(raw.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
             return {}
+        return decoded if isinstance(decoded, dict) else {}
 
-    def do_OPTIONS(self):  # CORS preflight for cross-origin dev setups
+    def do_OPTIONS(self):
         self.send_response(204)
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
@@ -101,6 +93,17 @@ class BridgeHandler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         path = urlparse(self.path).path
+
+        if path == "/api/publication/resolve":
+            body = self._read_json_body()
+            value = body.get("value")
+            if not isinstance(value, str) or not value.strip():
+                self._send_json(400, {"ok": False, "error": "value (DOI or URL containing DOI) required"})
+                return
+            result = resolve_publication(value.strip())
+            self._send_json(200 if result.get("ok") else 422, result)
+            return
+
         if path not in ("/api/perceive", "/api/act"):
             self._send_json(404, {"ok": False, "error": "no such route"})
             return
@@ -131,10 +134,11 @@ class BridgeHandler(SimpleHTTPRequestHandler):
 
 def main():
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8765
-    get_kernel()  # boot once up front so /api/state is meaningful immediately
+    get_kernel()
     server = ThreadingHTTPServer(("127.0.0.1", port), BridgeHandler)
     print(f"[bridge] URANO kernel bridge on http://localhost:{port}")
     print(f"[bridge] OSX Surface: http://localhost:{port}/urano/URANO%20OSX.html")
+    print("[bridge] Publication resolver: POST /api/publication/resolve")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
