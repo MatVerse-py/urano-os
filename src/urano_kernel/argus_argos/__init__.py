@@ -32,6 +32,7 @@ from .pipeline import (
     PipelinePolicy,
     PipelineResult,
 )
+from .corpus_harness import CorpusHarness, infer_representation, load_source, redacted_result
 
 __all__ = [
     "ArgusFinding",
@@ -59,4 +60,8 @@ __all__ = [
     "NullRetriever",
     "PipelinePolicy",
     "PipelineResult",
+    "CorpusHarness",
+    "infer_representation",
+    "load_source",
+    "redacted_result",
 ]
