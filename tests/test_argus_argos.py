@@ -66,6 +66,17 @@ class TestArgus(unittest.TestCase):
                 authority=PredicateAuthority(content=50),
             )
 
+    def test_integrity_conflict_requires_evidence_signal(self):
+        with self.assertRaises(ValueError):
+            self.argus.inspect(
+                claim_ref="claim://1",
+                source_ref="file://1",
+                representation="REPOSITORY_FILE",
+                content=b"bytes",
+                finding_type=ArgusFindingType.INTEGRITY_CONFLICT,
+                authority=PredicateAuthority(integrity=0),
+            )
+
     def test_unverified_can_exist_without_detector_signal(self):
         finding = self.argus.inspect(
             claim_ref="claim://1",
@@ -98,7 +109,7 @@ class TestArgos(unittest.TestCase):
     def setUp(self):
         self.argos = Argos()
 
-    def envelope(self, *, producer="ARGUS", authority=None, conflicts=(), epistemic_state=""):
+    def envelope(self, *, producer="ARGUS", authority=None, conflicts=(), epistemic_state="SUPPORTED"):
         return GovernanceEnvelope(
             record_id="record-1",
             producer=producer,
@@ -110,10 +121,15 @@ class TestArgos(unittest.TestCase):
 
     def test_passes_when_policy_is_satisfied(self):
         verdict = self.argos.adjudicate(
-            self.envelope(epistemic_state="SUPPORTED"),
+            self.envelope(),
             ArgosPolicy(required_authority={"content": 70, "integrity": 80}),
         )
         self.assertEqual(verdict.state, GovernanceState.PASS)
+
+    def test_missing_epistemic_state_holds(self):
+        verdict = self.argos.adjudicate(self.envelope(epistemic_state=""))
+        self.assertEqual(verdict.state, GovernanceState.HOLD)
+        self.assertIn("MISSING_EPISTEMIC_STATE", verdict.reasons)
 
     def test_unverified_holds_even_with_high_authority(self):
         verdict = self.argos.adjudicate(
@@ -133,6 +149,11 @@ class TestArgos(unittest.TestCase):
         )
         self.assertEqual(verdict.state, GovernanceState.HOLD)
         self.assertIn("EPISTEMIC_STATE_HOLD:CONTRADICTORY", verdict.reasons)
+
+    def test_integrity_conflict_holds(self):
+        verdict = self.argos.adjudicate(self.envelope(epistemic_state="INTEGRITY_CONFLICT"))
+        self.assertEqual(verdict.state, GovernanceState.HOLD)
+        self.assertIn("EPISTEMIC_STATE_HOLD:INTEGRITY_CONFLICT", verdict.reasons)
 
     def test_unknown_epistemic_state_holds_fail_closed(self):
         verdict = self.argos.adjudicate(
@@ -179,7 +200,7 @@ class TestArgos(unittest.TestCase):
 
     def test_argos_is_not_structurally_coupled_to_argus(self):
         verdict = self.argos.adjudicate(
-            self.envelope(producer="MANDELA"),
+            self.envelope(producer="MANDELA", epistemic_state="VERIFIED"),
             ArgosPolicy(allowed_producers=("ARGUS", "MANDELA", "CARTOMANCIA")),
         )
         self.assertEqual(verdict.state, GovernanceState.PASS)
