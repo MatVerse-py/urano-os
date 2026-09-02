@@ -5,7 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Iterable, Mapping
-import re
 
 from .models import PredicateAuthority
 from .source_intake import ParsedSource
@@ -145,7 +144,12 @@ class EvidenceComparator:
 
         claim_norm = _normalized(claim_text)
         text_norm = _normalized(source.text)
-        if relation is EvidenceRelation.NEUTRAL and claim_norm and claim_norm in text_norm:
+        if (
+            relation is EvidenceRelation.NEUTRAL
+            and metadata.get("claim_source") is not True
+            and claim_norm
+            and claim_norm in text_norm
+        ):
             relation = EvidenceRelation.SUPPORTS
             signals.append("EXACT_TEXT_MATCH")
 
