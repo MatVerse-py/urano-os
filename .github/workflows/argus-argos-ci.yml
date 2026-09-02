@@ -1,0 +1,56 @@
+name: ARGUS-ARGOS CI
+
+on:
+  pull_request:
+    paths:
+      - 'src/urano_kernel/argus_argos/**'
+      - 'src/urano_kernel/kernel.py'
+      - 'src/urano_kernel/event_runtime.py'
+      - 'tests/test_argus_argos*.py'
+      - 'tests/test_urano_argus_runtime.py'
+      - 'tests/test_corpus_harness.py'
+      - 'tests/test_bridge_retriever.py'
+      - 'examples/argus_corpus_manifest.example.json'
+      - 'examples/evidence/**'
+      - 'ARGUS_ARGOS_ARCHITECTURE_V0.md'
+      - '.github/workflows/argus-argos-ci.yml'
+  push:
+    branches:
+      - feature/argus-argos-core-v0
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile
+        run: python -m compileall -q src tests
+      - name: ARGUS-ARGOS unit, pipeline, runtime, corpus and Bridge tests
+        run: >-
+          python -m unittest
+          tests.test_argus_argos
+          tests.test_argus_pipeline
+          tests.test_urano_argus_runtime
+          tests.test_corpus_harness
+          tests.test_bridge_retriever
+          -v
+      - name: Corpus harness CLI smoke
+        run: |
+          python -m src.urano_kernel.argus_argos.corpus_harness examples/argus_corpus_manifest.example.json --output /tmp/argus-report.json
+          python - <<'PY'
+          import json
+          with open('/tmp/argus-report.json', encoding='utf-8') as fh:
+              report = json.load(fh)
+          assert report['schema'] == 'matverse.argus-corpus-audit.v1'
+          assert report['result_count'] == 1
+          assert report['results'][0]['finding_type'] == 'SUPPORTED'
+          assert report['results'][0]['governance_state'] == 'PASS'
+          assert 'claim_text' not in report['results'][0]
+          PY
+      - name: Full regression suite
+        run: python -m unittest discover -s tests -v
