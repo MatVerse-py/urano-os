@@ -3,6 +3,7 @@ from .event_runtime import EventRuntime
 from .cassandra_gate import CassandraGate
 from .memory_gate import MemoryGate
 from .evidence_pack import EvidencePack
+from .evidence_gate import EvidenceClass
 import uuid
 
 class UranoKernel:
@@ -19,7 +20,8 @@ class UranoKernel:
 
     def _handle_perception(self, event):
         ok, status = self.cassandra.perceive(event.payload)
-        self.evidence.add("cassandra_gate", {"input": event.payload, "status": status})
+        # status é resultado de um cálculo do gate, não texto observado bruto.
+        self.evidence.add("cassandra_gate", {"input": event.payload, "status": status}, EvidenceClass.COMPUTED)
         if ok:
             self.memory.append({"event": "perception", "payload": event.payload})
             return f"PERCEPTION_OK: {status}"
@@ -28,7 +30,8 @@ class UranoKernel:
     def _handle_action(self, event):
         self.cassandra.speak(f"Executing action: {event.payload}")
         self.memory.append({"event": "action", "payload": event.payload})
-        self.evidence.add("action_log", event.payload)
+        # payload é o texto de entrada tal como recebido no evento.
+        self.evidence.add("action_log", event.payload, EvidenceClass.OBSERVED_TEXT)
         return "ACTION_EXECUTED"
 
     def boot(self):
@@ -42,4 +45,4 @@ if __name__ == "__main__":
     kernel.boot()
     kernel.runtime.emit("perception", "Observing digital life cycle")
     kernel.runtime.emit("action", "Initializing primary ledger link")
-    print(f"Evidence Seal: {kernel.evidence.seal()}")
+    print(f"Evidence Seal: {kernel.evidence.seal(require_publishable=True)}")
