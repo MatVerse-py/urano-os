@@ -90,6 +90,7 @@ class TestArgus(unittest.TestCase):
         envelope = finding.governance_envelope()
         self.assertEqual(envelope.producer, "ARGUS")
         self.assertEqual(envelope.subject_ref, "claim://1")
+        self.assertEqual(envelope.epistemic_state, "OUT_OF_CONTEXT")
         self.assertEqual(envelope.metadata["finding_type"], "OUT_OF_CONTEXT")
 
 
@@ -97,21 +98,49 @@ class TestArgos(unittest.TestCase):
     def setUp(self):
         self.argos = Argos()
 
-    def envelope(self, *, producer="ARGUS", authority=None, conflicts=()):
+    def envelope(self, *, producer="ARGUS", authority=None, conflicts=(), epistemic_state=""):
         return GovernanceEnvelope(
             record_id="record-1",
             producer=producer,
             subject_ref="subject://1",
             authority=authority or PredicateAuthority(content=80, integrity=90),
+            epistemic_state=epistemic_state,
             conflicts=conflicts,
         )
 
     def test_passes_when_policy_is_satisfied(self):
         verdict = self.argos.adjudicate(
-            self.envelope(),
+            self.envelope(epistemic_state="SUPPORTED"),
             ArgosPolicy(required_authority={"content": 70, "integrity": 80}),
         )
         self.assertEqual(verdict.state, GovernanceState.PASS)
+
+    def test_unverified_holds_even_with_high_authority(self):
+        verdict = self.argos.adjudicate(
+            self.envelope(
+                epistemic_state="UNVERIFIED",
+                authority=PredicateAuthority(content=95, integrity=95),
+            ),
+            ArgosPolicy(required_authority={"content": 70, "integrity": 80}),
+        )
+        self.assertEqual(verdict.state, GovernanceState.HOLD)
+        self.assertIn("EPISTEMIC_STATE_HOLD:UNVERIFIED", verdict.reasons)
+
+    def test_contradictory_holds_without_needing_conflict_field(self):
+        verdict = self.argos.adjudicate(
+            self.envelope(epistemic_state="CONTRADICTORY"),
+            ArgosPolicy(required_authority={"content": 70}),
+        )
+        self.assertEqual(verdict.state, GovernanceState.HOLD)
+        self.assertIn("EPISTEMIC_STATE_HOLD:CONTRADICTORY", verdict.reasons)
+
+    def test_policy_can_hard_block_epistemic_state(self):
+        verdict = self.argos.adjudicate(
+            self.envelope(epistemic_state="FABRICATION_SUSPECTED"),
+            ArgosPolicy(block_epistemic_states=("FABRICATION_SUSPECTED",)),
+        )
+        self.assertEqual(verdict.state, GovernanceState.BLOCK)
+        self.assertIn("EPISTEMIC_STATE_BLOCK:FABRICATION_SUSPECTED", verdict.reasons)
 
     def test_holds_below_authority_threshold(self):
         verdict = self.argos.adjudicate(
