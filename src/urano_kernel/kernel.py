@@ -7,17 +7,23 @@ from .event_runtime import EventRuntime
 from .cassandra_gate import CassandraGate
 from .memory_gate import MemoryGate
 from .evidence_pack import EvidencePack
-from .argus_argos import ArgusPipeline, ClaimCandidate, SourceDocument
+from .argus_argos import (
+    ArgusPipeline,
+    BridgeProtocolError,
+    ClaimCandidate,
+    EvidenceRetriever,
+    SourceDocument,
+)
 
 
 class UranoKernel:
-    def __init__(self):
+    def __init__(self, *, argus_retriever: EvidenceRetriever | None = None):
         self.runtime = EventRuntime()
         self.cassandra = CassandraGate()
         self.memory = MemoryGate()
         self.session_id = str(uuid.uuid4())
         self.evidence = EvidencePack(self.session_id)
-        self.argus_pipeline = ArgusPipeline()
+        self.argus_pipeline = ArgusPipeline(retriever=argus_retriever)
 
         # Existing handlers preserve legacy behavior. ARGUS payloads are marked
         # non-retained because they may contain sensitive documents/media.
@@ -85,6 +91,14 @@ class UranoKernel:
         self._record_argus_summary(summary)
         return summary
 
+    def _held_argus_result(self, reason: str) -> dict:
+        summary = {
+            "governance_state": "HOLD",
+            "governance_reasons": (reason,),
+        }
+        self._record_argus_summary(summary)
+        return summary
+
     def _handle_argus_case(self, event):
         payload = event.payload
         if not isinstance(payload, dict):
@@ -114,7 +128,10 @@ class UranoKernel:
             source_ref=source_ref,
             ordinal=1,
         )
-        result = self.argus_pipeline.analyze_claim(claim=claim, evidence=evidence)
+        try:
+            result = self.argus_pipeline.analyze_claim(claim=claim, evidence=evidence)
+        except BridgeProtocolError:
+            return self._held_argus_result("BRIDGE_RETRIEVAL_UNAVAILABLE")
         summary = self._decision_summary(result)
         self._record_argus_summary(summary)
         return summary
@@ -134,6 +151,8 @@ class UranoKernel:
                 for item in tuple(payload.get("evidence") or ())
             )
             results = self.argus_pipeline.analyze_document(document, evidence=evidence)
+        except BridgeProtocolError:
+            return self._held_argus_result("BRIDGE_RETRIEVAL_UNAVAILABLE")
         except (TypeError, ValueError):
             return self._blocked_argus_result("MALFORMED_DOCUMENT_OR_EVIDENCE")
 
