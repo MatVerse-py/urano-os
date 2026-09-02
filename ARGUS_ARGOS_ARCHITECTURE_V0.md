@@ -4,75 +4,96 @@
 
 Corrected candidate architecture for URANO, grounded in the corpus distinction:
 
-- `ARGUS` = vertical fake-news / factual-integrity tool;
-- `ARGOS` = broader operational system for evidence governance.
+- `ARGUS` = vertical fake-news / misinformation / factual-integrity tool;
+- `ARGOS` = broader operational system for evidence governance;
+- `URANO` = host/runtime/laboratory that integrates these organs.
 
-The project labels are preserved and no acronym expansion is invented or frozen in this PR.
+The project labels are preserved. This PR does not invent or freeze acronym expansions.
 
 ## Placement
 
-URANO is the host/runtime environment. ARGOS is a governance system hosted by URANO. ARGUS is a specialized tool that produces factual-integrity findings which ARGOS may govern alongside outputs from other laboratories.
-
 ```text
 URANO
-├── ARGOS  (evidence governance system)
+├── ARGOS  (evidence-governance system)
 │   ├── policy / admissibility
 │   ├── Ω-Gate / downstream gates
 │   ├── ledger / receipts / replay
 │   ├── review / contest / revocation
 │   ├── external witness integration
-│   └── receives governed records from multiple producers
+│   └── governed records from multiple producers
 │
 ├── ARGUS  (fake-news / factual-integrity tool)
 ├── MANDELA (separate analytical producer; not implemented here)
 └── CARTOMANCIA (separate analytical producer; not implemented here)
 ```
 
-A representative ARGUS flow is:
+ARGOS is not structurally dependent on ARGUS. Any authorized producer can emit a `GovernanceEnvelope` with an explicit epistemic state and predicate-specific authority.
+
+## End-to-end flow implemented in this PR
 
 ```text
 SOURCE / CLAIM / MEDIA
   ↓
-Bridge / ingest / ARGUS Connect adapters
+Bridge / local corpus / ARGUS Connect / explicit adapter
   ↓
-ARGUS investigation
+SourceIntake
+  ├── representation class
+  ├── SHA-256
+  ├── expected-hash check
+  ├── provenance flags
+  ├── generated/derivative classification
+  └── predicate authority
+  ↓
+ClaimExtractor
+  ↓
+EvidenceComparator
+  ↓
+EvidenceRootIndex
+  ├── exact-byte/root deduplication
+  ├── derivative representations do not inflate support
+  ├── generated material is not independent support
+  └── max authority per predicate, never additive voting
+  ↓
+ARGUS
   ↓
 ArgusFinding
   ↓
-GovernanceEnvelope(producer="ARGUS")
+GovernanceEnvelope
   ↓
-ARGOS governance kernel
+ARGOS
   ↓
 PASS | HOLD | BLOCK
   ↓
-policy / gate / ledger / receipt / replay
-  ↓
 URANO runtime
+  ├── redacted event history
+  ├── decision summary
+  ├── MemoryGate hash-chain
+  └── EvidencePack seal
 ```
-
-ARGOS is not structurally dependent on ARGUS. A producer such as MANDELA or CARTOMANCIA can create its own `GovernanceEnvelope` and be governed by the same ARGOS policy layer.
 
 ## ARGUS — exact function
 
-ARGUS is the vertical tool for fake news, misinformation and factual integrity. Its scope includes organizing evidence about:
+ARGUS is the vertical tool for fake news, misinformation and factual integrity. It organizes inspectable evidence about:
 
 - false, misleading or unverifiable claims;
-- contradictions between sources;
+- contradictions between independent source roots;
 - loss of context / decontextualization;
-- suspected media manipulation or deepfake evidence;
+- integrity mismatches;
+- suspected media manipulation or deepfake evidence supplied by explicit detectors;
 - suspected documentary fabrication;
 - suspected artificial coordination / disinformation campaigns;
 - provenance and factual-support signals used in human or automated investigation.
 
-ARGUS does **not** infer truth from raw content by default. In v0, stronger findings require explicit evidence signals or conflicts. Suspicion labels remain suspicions and are not silently promoted to final factual conclusions.
+ARGUS does **not** infer truth from raw content by default. Strong or suspicious findings require evidence signals or conflicts. Suspicion labels remain suspicions; they are not silently promoted to final factual conclusions.
 
-Current conservative finding states:
+Current finding states:
 
 - `SUPPORTED`
 - `UNVERIFIED`
 - `INSUFFICIENT_EVIDENCE`
 - `CONTRADICTORY`
 - `OUT_OF_CONTEXT`
+- `INTEGRITY_CONFLICT`
 - `MANIPULATION_SUSPECTED`
 - `FABRICATION_SUSPECTED`
 - `COORDINATION_SUSPECTED`
@@ -81,59 +102,164 @@ ARGUS does not own system-wide publication, persistence, ledger, receipts or rep
 
 ## ARGOS — exact function
 
-ARGOS is the broader operational evidence-governance system. Its canonical scope is larger than the `Argos` class implemented in this PR.
+ARGOS is the broader operational evidence-governance system. Its canonical scope is larger than the `Argos` class implemented here.
 
 ARGOS governs:
 
 - evidence admissibility;
+- explicit epistemic state;
 - policy application;
 - authority thresholds by predicate;
+- allowed producers;
 - unresolved conflicts;
-- execution/publication gating through downstream contracts;
+- downstream execution/publication gates;
 - receipts;
 - ledger;
 - replay;
 - human review;
 - contestation and revocation;
-- external witness / independent validation integration;
-- governed integration of outputs from multiple tools and laboratories.
+- external witness / independent validation;
+- integration of outputs from multiple tools and laboratories.
 
-The v0 `Argos` class implements only the policy-adjudication kernel needed to establish this boundary. It accepts a generic `GovernanceEnvelope` rather than an ARGUS-specific observation.
+The v0 `Argos` class is the policy-adjudication kernel. It accepts a generic `GovernanceEnvelope` rather than an ARGUS-specific object.
+
+Fail-closed rules include:
+
+- missing epistemic state → `HOLD`;
+- unknown epistemic state → `HOLD` unless explicitly mapped by policy;
+- `UNVERIFIED`, `INSUFFICIENT_EVIDENCE`, `CONTRADICTORY`, `OUT_OF_CONTEXT` and suspicious/integrity states → `HOLD` by default;
+- high numeric authority cannot override an unresolved epistemic state;
+- unresolved conflict → `HOLD`, or `BLOCK` under strict policy;
+- malformed governance envelope → `BLOCK`.
 
 Current kernel outcomes:
 
 - `PASS`: explicit policy requirements are satisfied;
-- `HOLD`: evidence is incomplete, below threshold, from a disallowed producer, ambiguous or conflicted;
-- `BLOCK`: malformed governance input or a policy-defined hard conflict.
+- `HOLD`: evidence/context/authority/state remains unresolved;
+- `BLOCK`: malformed input or a policy-defined hard prohibition.
 
-## Related components
+## Source representations and authority
 
-The corpus distinguishes these names from the canonical ARGUS/ARGOS roles:
+The URANO intake mirrors the evidence classes already used by the GPT-Project-Bridge, without importing that repository at runtime. Supported policy classes include:
 
-- `ARGUS Connect`: user-facing intake / explorer / review interface; not the ARGUS analytical core and not ARGOS itself.
-- `ARGOS Agent`: backend/executor for jobs, models, hashing, APIs and automations; not the full ARGOS governance system.
-
-Neither component is implemented by this PR.
-
-## Predicate authority
+`LIVE_HTML | API_METADATA | SAVED_HTML | LATEX_SOURCE | ARXIV_EPRINT_SOURCE | SAVED_PDF | SAVED_IMAGE | SCREENSHOT | DOCUMENT_PAGE_RENDER | GENERATED_IMAGE | DOI_METADATA | ORCID_SNAPSHOT | REPOSITORY_FILE | GIT_COMMIT | HF_SNAPSHOT | CORPUS_COPY | MODEL_REPORT | OBSERVED_TEXT`
 
 Authority is a policy vector, not a probability of truth:
 
 `content | version | authorship | publication | timestamp | execution | integrity | custody`
 
-A source can be strong for one predicate and weak or irrelevant for another.
+Examples:
+
+- TeX may be strong for content/version but not publication;
+- DOI metadata may be strong for publication but weak for paper-content claims;
+- screenshots prove rendered state, not backend state;
+- generated images and document-page renders are non-independent;
+- matching expected SHA-256 supports byte integrity only;
+- high entropy is recorded as a descriptive statistic and is not interpreted as proof of steganography/manipulation.
+
+## Evidence-root semantics
+
+`EvidenceRoot != RepresentationCount`.
+
+The same evidentiary origin may exist as HTML, PDF, PNG, screenshot or local copy. Those representations must not become artificial independent votes.
+
+The v0 root index therefore:
+
+1. groups exact duplicate bytes by SHA-256 by default;
+2. accepts an explicit `evidence_root_id`/derivation root from a trusted adapter;
+3. counts generated and derivative representations as non-independent;
+4. aggregates authority by maximum per predicate domain, never by summing corroborators;
+5. keeps perceptually similar but byte-different files separate unless a derivation relation is explicitly demonstrated.
+
+A claim source cannot support itself merely because its own text contains the claim. `claim_source=true` suppresses that self-corroboration path.
+
+## Conservative comparator
+
+The built-in comparator is intentionally narrow and replayable. It supports:
+
+- explicit adapter relation: `SUPPORTS | CONTRADICTS | CONTEXTUALIZES | INTEGRITY_WARNING`;
+- exact textual support from an independent source;
+- expected SHA-256 mismatch → integrity conflict;
+- explicit context-loss status;
+- structured HTML metadata contradiction such as archived prose saying a DOI is pending while `citation_doi` already exists;
+- explicit integrity status from a media/document detector.
+
+It does not use a language model as an opaque truth oracle. Rich semantic search, web resolution, deepfake models or institutional databases should enter through adapters and leave inspectable signals/evidence roots.
+
+## CorpusHarness
+
+`CorpusHarness` lets the same pipeline run locally over real corpus material without copying that corpus into GitHub.
+
+It can:
+
+- infer conservative representation types from file suffixes;
+- accept explicit representation/root/hash/context/relation metadata in a JSON manifest;
+- analyze a single claim or extract claims from text/HTML/TeX/corpus files;
+- use PDF/images as evidence while refusing to interpret binary bytes as claim text without an extracted-text representation;
+- generate `matverse.argus-corpus-audit.v1` JSON reports;
+- redact raw claim text by default.
+
+Example command:
+
+```bash
+python -m src.urano_kernel.argus_argos.corpus_harness audit.json --output report.json
+```
+
+## URANO runtime integration
+
+URANO registers two governed events:
+
+- `argus_case`: one explicit claim plus evidence;
+- `argus_document`: a textual document plus optional evidence.
+
+Both event types use `retain_payload=False`. The runtime history stores only a SHA-256 commitment to the incoming payload. MemoryGate and EvidencePack receive only redacted decision summaries containing hashes, states, authority and evidence-root identifiers.
+
+Raw claim/evidence content is therefore not duplicated into URANO operational memory by default.
+
+Malformed ARGUS runtime payloads fail closed as `BLOCK` summaries.
+
+## Related components
+
+- `ARGUS Connect`: user-facing intake / explorer / review interface; not the ARGUS analytical core and not ARGOS itself.
+- `ARGOS Agent`: backend/executor for jobs, models, hashing, APIs and automations; not the full ARGOS governance system.
+- `GPT-Project-Bridge`: source acquisition/resolution/interoperability layer. It should supply governed representations and resolved metadata to ARGUS rather than being duplicated inside URANO.
+- `Evidence Gate` / `Ω-Gate`: downstream enforcement mechanisms; ARGOS is broader than either individual gate.
 
 ## Boundaries
 
-- `ARGUS != ARGOS`: fake-news/factual-integrity analysis is not the governance system.
-- `ARGUS != Bridge`: Bridge acquires/transports/resolves source evidence; ARGUS investigates factual-integrity questions.
-- `ARGUS Connect != ARGUS`: interface is not analytical core.
-- `ARGOS Agent != ARGOS`: executor is not the governance system.
-- `ARGOS != Ω-Gate`: ARGOS is broader; Ω-Gate is one governed passage/enforcement mechanism.
-- `ARGOS != URANO`: URANO hosts and integrates ARGOS and other organs.
-- `EvidenceRoot != RepresentationCount`: derivative representations must not inflate evidence count.
-- `ClaimedID != ResolvedID`: identifiers asserted inside an artifact require independent resolution.
+- `ARGUS != ARGOS`.
+- `ARGUS != Bridge`.
+- `ARGUS Connect != ARGUS`.
+- `ARGOS Agent != ARGOS`.
+- `ARGOS != Ω-Gate`.
+- `ARGOS != URANO`.
+- `ClaimedID != ResolvedID`.
+- `EvidenceRoot != RepresentationCount`.
+- `HighAuthority != VerifiedEpistemicState`.
+- `GeneratedRepresentation != IndependentEvidence`.
+
+## Validation status
+
+The implementation is covered by CI for:
+
+- role separation;
+- epistemic fail-closed behavior;
+- source intake;
+- predicate authority;
+- evidence-root deduplication;
+- generated/derivative evidence handling;
+- integrity hash checks;
+- context and metadata conflicts;
+- claim self-support prevention;
+- end-to-end ARGUS → ARGOS pipeline;
+- URANO runtime integration and payload redaction;
+- local CorpusHarness behavior;
+- full repository regression suite.
+
+These tests validate software behavior, not the truth of arbitrary external claims. External verification quality still depends on the evidence and adapters supplied to the pipeline.
 
 ## Integration strategy
 
-This PR remains independent of PR #4 (`evidence_gate`) to avoid stacked-branch coupling. After PR #4 lands, a follow-up should map `GovernanceDecision` into the gate contract rather than duplicating gate semantics.
+This PR remains independent of PR #4 (`evidence_gate`) to avoid stacked-branch coupling. After PR #4 lands, a follow-up should map `GovernanceDecision` into that gate contract rather than duplicating gate semantics.
+
+Live web/Bridge/deepfake retrieval remains an adapter boundary. The core is intentionally usable offline and fail-closed when no independent evidence is supplied.
