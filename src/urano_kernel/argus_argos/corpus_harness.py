@@ -8,7 +8,6 @@ claim text without an explicit extracted-text representation.
 
 from __future__ import annotations
 
-from dataclasses import asdict
 from hashlib import sha256
 from pathlib import Path
 from typing import Any, Mapping, Sequence
