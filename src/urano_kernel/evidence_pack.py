@@ -4,7 +4,8 @@ import json
 from typing import List, Dict, Any
 import time
 
-from .evidence_gate import EvidenceClass
+from .evidence_gate import EvidenceClass, PUBLISHABLE
+
 
 class EvidencePack:
     def __init__(self, session_id: str):
@@ -20,13 +21,24 @@ class EvidencePack:
         })
 
     def can_publish(self) -> bool:
-        """CanPublish: nenhuma entrada UNVERIFIED pode sair como prova selada."""
-        return all(e["evidence_class"] != EvidenceClass.UNVERIFIED.value for e in self.evidence)
+        """CanPublish: toda entrada deve possuir classe mecanicamente verificável."""
+        for entry in self.evidence:
+            try:
+                evidence_class = EvidenceClass(entry["evidence_class"])
+            except (KeyError, ValueError, TypeError):
+                return False
+            if evidence_class not in PUBLISHABLE:
+                return False
+        return True
 
     def seal(self, require_publishable: bool = False) -> str:
         if require_publishable and not self.can_publish():
-            unverified = [e["source"] for e in self.evidence if e["evidence_class"] == EvidenceClass.UNVERIFIED.value]
-            raise ValueError(f"CanPublish falhou: evidência UNVERIFIED em {unverified}")
+            blocked = [
+                e.get("source", "")
+                for e in self.evidence
+                if e.get("evidence_class") not in {c.value for c in PUBLISHABLE}
+            ]
+            raise ValueError(f"CanPublish falhou: evidência não-publicável em {blocked}")
         pack = {
             "session_id": self.session_id,
             "evidence": self.evidence,
