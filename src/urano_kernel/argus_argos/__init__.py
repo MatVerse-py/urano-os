@@ -32,6 +32,12 @@ from .pipeline import (
     PipelinePolicy,
     PipelineResult,
 )
+from .bridge_retriever import (
+    BATCH_SCHEMA,
+    QUERY_SCHEMA,
+    BridgeEvidenceRetriever,
+    BridgeProtocolError,
+)
 from .corpus_harness import CorpusHarness, infer_representation, load_source, redacted_result
 
 __all__ = [
@@ -60,6 +66,10 @@ __all__ = [
     "NullRetriever",
     "PipelinePolicy",
     "PipelineResult",
+    "BATCH_SCHEMA",
+    "QUERY_SCHEMA",
+    "BridgeEvidenceRetriever",
+    "BridgeProtocolError",
     "CorpusHarness",
     "infer_representation",
     "load_source",
