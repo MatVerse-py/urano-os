@@ -23,8 +23,7 @@ class Argus:
     provenance evidence. It does not govern persistence, publication, ledger,
     replay or system policy; those responsibilities belong to ARGOS.
 
-    This v0 does not pretend to infer truth from raw content. A caller must
-    provide an explicit finding type and evidence signals. Findings stronger
+    This core does not pretend to infer truth from raw content. Findings stronger
     than UNVERIFIED/INSUFFICIENT_EVIDENCE require at least one supporting
     signal or conflict, preventing unsupported labels from being emitted.
     """
@@ -33,6 +32,7 @@ class Argus:
         ArgusFindingType.SUPPORTED,
         ArgusFindingType.CONTRADICTORY,
         ArgusFindingType.OUT_OF_CONTEXT,
+        ArgusFindingType.INTEGRITY_CONFLICT,
         ArgusFindingType.MANIPULATION_SUSPECTED,
         ArgusFindingType.FABRICATION_SUSPECTED,
         ArgusFindingType.COORDINATION_SUSPECTED,
