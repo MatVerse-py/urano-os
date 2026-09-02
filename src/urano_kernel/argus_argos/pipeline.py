@@ -62,11 +62,7 @@ class PipelineResult:
 
 
 class ClaimExtractor:
-    """Conservative declarative-claim extractor.
-
-    It preserves source text and only segments plausible declarative statements;
-    it does not rewrite, paraphrase or infer claims.
-    """
+    """Conservative declarative-claim extractor."""
 
     _SPLIT_RE = re.compile(r"(?<=[.!;])\s+|\n+")
 
@@ -131,6 +127,33 @@ class ArgusPipeline:
     def _claim_source(document: SourceDocument) -> SourceDocument:
         metadata = dict(document.metadata)
         metadata["claim_source"] = True
+        return SourceDocument(
+            locator=document.locator,
+            representation=document.representation,
+            content=document.content,
+            metadata=metadata,
+            expected_sha256=document.expected_sha256,
+            evidence_root_id=document.evidence_root_id,
+        )
+
+    @staticmethod
+    def _scope_shared_evidence(document: SourceDocument, claim: ClaimCandidate) -> SourceDocument:
+        """Drop unbound claim-scoped controls from evidence reused across claims."""
+        metadata = dict(document.metadata)
+        controls_present = any(key in metadata for key in ("claim_relation", "context_status"))
+        if not controls_present:
+            return document
+
+        bound_ref = str(metadata.get("relation_claim_ref") or "").strip()
+        bound_hash = str(metadata.get("relation_claim_sha256") or "").strip().lower()
+        claim_hash = sha256(" ".join(claim.text.split()).encode("utf-8")).hexdigest()
+        bound = bool((bound_ref and bound_ref == claim.claim_ref) or (bound_hash and bound_hash == claim_hash))
+        if bound:
+            return document
+
+        metadata.pop("claim_relation", None)
+        metadata.pop("context_status", None)
+        metadata["unbound_claim_control_dropped"] = True
         return SourceDocument(
             locator=document.locator,
             representation=document.representation,
@@ -251,7 +274,7 @@ class ArgusPipeline:
         return tuple(
             self.analyze_claim(
                 claim=claim,
-                evidence=evidence,
+                evidence=tuple(self._scope_shared_evidence(item, claim) for item in evidence),
                 include_claim_source=document,
             )
             for claim in claims
