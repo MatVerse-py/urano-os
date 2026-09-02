@@ -9,6 +9,8 @@ on:
       - 'tests/test_argus_argos*.py'
       - 'tests/test_urano_argus_runtime.py'
       - 'tests/test_corpus_harness.py'
+      - 'examples/argus_corpus_manifest.example.json'
+      - 'examples/evidence/**'
       - 'ARGUS_ARGOS_ARCHITECTURE_V0.md'
       - '.github/workflows/argus-argos-ci.yml'
   push:
@@ -35,5 +37,18 @@ jobs:
           tests.test_urano_argus_runtime
           tests.test_corpus_harness
           -v
+      - name: Corpus harness CLI smoke
+        run: |
+          python -m src.urano_kernel.argus_argos.corpus_harness examples/argus_corpus_manifest.example.json --output /tmp/argus-report.json
+          python - <<'PY'
+          import json
+          with open('/tmp/argus-report.json', encoding='utf-8') as fh:
+              report = json.load(fh)
+          assert report['schema'] == 'matverse.argus-corpus-audit.v1'
+          assert report['result_count'] == 1
+          assert report['results'][0]['finding_type'] == 'SUPPORTED'
+          assert report['results'][0]['governance_state'] == 'PASS'
+          assert 'claim_text' not in report['results'][0]
+          PY
       - name: Full regression suite
         run: python -m unittest discover -s tests -v
