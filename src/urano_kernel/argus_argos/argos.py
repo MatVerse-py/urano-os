@@ -14,10 +14,16 @@ class ArgosPolicy:
     Missing or sub-threshold authority keeps a record in HOLD. Epistemic state
     is evaluated separately from numeric authority so an unresolved finding
     cannot become admissible merely by carrying high weights.
+
+    By default ARGOS also requires an explicit authority policy. A caller that
+    intentionally wants epistemic-state-only governance must opt out with
+    `require_authority_policy=False`; an empty map must never silently mean
+    "no evidence threshold required".
     """
 
     policy_id: str = "argos.governance.default.v0"
     required_authority: Mapping[str, int] = field(default_factory=dict)
+    require_authority_policy: bool = True
     block_on_conflict: bool = False
     allowed_producers: tuple[str, ...] = ()
     pass_epistemic_states: tuple[str, ...] = ("SUPPORTED", "VERIFIED", "ADMISSIBLE")
@@ -93,6 +99,9 @@ class Argos:
                     reasons=tuple(reasons),
                     policy_id=policy.policy_id,
                 )
+
+        if policy.require_authority_policy and not policy.required_authority:
+            reasons.append("MISSING_AUTHORITY_POLICY")
 
         for domain, minimum in policy.required_authority.items():
             if domain not in authority:
