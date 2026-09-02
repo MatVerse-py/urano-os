@@ -16,6 +16,22 @@ from .argus_argos import (
 )
 
 
+MAX_ARGUS_CLAIM_CHARS = 10_000
+MAX_ARGUS_EVIDENCE_ITEMS = 64
+MAX_ARGUS_SOURCE_BYTES = 2 * 1024 * 1024
+MAX_ARGUS_TOTAL_SOURCE_BYTES = 8 * 1024 * 1024
+MAX_ARGUS_REF_CHARS = 2048
+TEXTUAL_CLAIM_REPRESENTATIONS = {
+    "CORPUS_COPY",
+    "SAVED_HTML",
+    "LIVE_HTML",
+    "LATEX_SOURCE",
+    "ARXIV_EPRINT_SOURCE",
+    "REPOSITORY_FILE",
+    "OBSERVED_TEXT",
+}
+
+
 class UranoKernel:
     def __init__(self, *, argus_retriever: EvidenceRetriever | None = None):
         self.runtime = EventRuntime()
@@ -47,17 +63,52 @@ class UranoKernel:
         return "ACTION_EXECUTED"
 
     @staticmethod
-    def _source_from_payload(item: dict) -> SourceDocument:
+    def _content_size(content) -> int:
+        if isinstance(content, bytes):
+            return len(content)
+        if isinstance(content, str):
+            return len(content.encode("utf-8"))
+        # Runtime inputs are JSON-shaped. Reject arbitrary objects instead of
+        # stringifying them into an ambiguous evidence representation.
+        raise ValueError("source content must be text or bytes")
+
+    @staticmethod
+    def _validate_ref(value: object, *, field_name: str) -> str:
+        text = str(value or "").strip()
+        if len(text) > MAX_ARGUS_REF_CHARS:
+            raise ValueError(f"{field_name} exceeds runtime limit")
+        return text
+
+    @classmethod
+    def _source_from_payload(cls, item: dict) -> SourceDocument:
         if not isinstance(item, dict):
             raise ValueError("evidence entries must be objects")
+        content = item.get("content", "")
+        if cls._content_size(content) > MAX_ARGUS_SOURCE_BYTES:
+            raise ValueError("source content exceeds runtime limit")
+        metadata = item.get("metadata") or {}
+        if not isinstance(metadata, dict):
+            raise ValueError("source metadata must be an object")
         return SourceDocument(
-            locator=str(item.get("locator") or ""),
-            representation=str(item.get("representation") or ""),
-            content=item.get("content", ""),
-            metadata=dict(item.get("metadata") or {}),
+            locator=cls._validate_ref(item.get("locator"), field_name="locator"),
+            representation=cls._validate_ref(item.get("representation"), field_name="representation"),
+            content=content,
+            metadata=dict(metadata),
             expected_sha256=item.get("expected_sha256"),
             evidence_root_id=item.get("evidence_root_id"),
         )
+
+    @classmethod
+    def _evidence_from_payload(cls, payload: dict) -> tuple[SourceDocument, ...]:
+        raw_evidence = payload.get("evidence") or ()
+        if not isinstance(raw_evidence, (list, tuple)):
+            raise ValueError("evidence must be an array")
+        if len(raw_evidence) > MAX_ARGUS_EVIDENCE_ITEMS:
+            raise OverflowError("too many evidence entries")
+        evidence = tuple(cls._source_from_payload(item) for item in raw_evidence)
+        if sum(cls._content_size(item.content) for item in evidence) > MAX_ARGUS_TOTAL_SOURCE_BYTES:
+            raise OverflowError("aggregate evidence exceeds runtime limit")
+        return evidence
 
     @staticmethod
     def _decision_summary(result) -> dict:
@@ -77,9 +128,6 @@ class UranoKernel:
         }
 
     def _record_argus_summary(self, summary: dict) -> None:
-        # Intentionally records only hashes/decisions/root ids, never raw claim or
-        # evidence content. This keeps operational replay material without
-        # duplicating sensitive source material inside URANO memory.
         self.evidence.add("argus_argos_decision", summary)
         self.memory.append({"event": "argus_argos_decision", "summary": summary})
 
@@ -107,21 +155,25 @@ class UranoKernel:
         claim_text = str(payload.get("claim") or "").strip()
         if not claim_text:
             return self._blocked_argus_result("MISSING_CLAIM")
+        if len(claim_text) > MAX_ARGUS_CLAIM_CHARS:
+            return self._blocked_argus_result("ARGUS_INPUT_LIMIT_EXCEEDED")
 
         try:
-            evidence = tuple(
-                self._source_from_payload(item)
-                for item in tuple(payload.get("evidence") or ())
+            evidence = self._evidence_from_payload(payload)
+            claim_ref = self._validate_ref(payload.get("claim_ref"), field_name="claim_ref")
+            source_ref = self._validate_ref(
+                payload.get("source_ref") or "runtime://argus-case",
+                field_name="source_ref",
             )
+        except OverflowError:
+            return self._blocked_argus_result("ARGUS_INPUT_LIMIT_EXCEEDED")
         except (TypeError, ValueError):
             return self._blocked_argus_result("MALFORMED_EVIDENCE")
 
-        claim_ref = str(payload.get("claim_ref") or "").strip()
         if not claim_ref:
             digest = sha256(claim_text.encode("utf-8")).hexdigest()[:24]
             claim_ref = f"claim://runtime-{digest}"
 
-        source_ref = str(payload.get("source_ref") or "runtime://argus-case")
         claim = ClaimCandidate(
             claim_ref=claim_ref,
             text=claim_text,
@@ -146,11 +198,12 @@ class UranoKernel:
 
         try:
             document = self._source_from_payload(document_data)
-            evidence = tuple(
-                self._source_from_payload(item)
-                for item in tuple(payload.get("evidence") or ())
-            )
+            if document.representation.strip().upper() not in TEXTUAL_CLAIM_REPRESENTATIONS:
+                return self._blocked_argus_result("BINARY_DOCUMENT_REQUIRES_EXTRACTED_TEXT")
+            evidence = self._evidence_from_payload(payload)
             results = self.argus_pipeline.analyze_document(document, evidence=evidence)
+        except OverflowError:
+            return self._blocked_argus_result("ARGUS_INPUT_LIMIT_EXCEEDED")
         except BridgeProtocolError:
             return self._held_argus_result("BRIDGE_RETRIEVAL_UNAVAILABLE")
         except (TypeError, ValueError):
