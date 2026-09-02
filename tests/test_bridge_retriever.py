@@ -1,3 +1,4 @@
+import hashlib
 import json
 import unittest
 
@@ -12,18 +13,51 @@ from src.urano_kernel.kernel import UranoKernel
 
 
 class TestBridgeEvidenceRetriever(unittest.TestCase):
-    def transport_for(self, payload):
+    def transport_for(self, payload, *, expect_full_text=False):
         def transport(url, request_body, headers, timeout):
             query = json.loads(request_body.decode("utf-8"))
             self.assertEqual(query["schema"], "matverse.argus-evidence-query.v1")
             self.assertIn("claim_ref", query)
-            self.assertIn("claim_text", query)
+            self.assertIn("claim_sha256", query)
+            self.assertIn("query_terms", query)
+            if expect_full_text:
+                self.assertIn("claim_text", query)
+            else:
+                self.assertNotIn("claim_text", query)
             return json.dumps(payload).encode("utf-8")
         return transport
 
+    def test_default_query_does_not_disclose_full_claim(self):
+        captured = {}
+
+        def transport(url, request_body, headers, timeout):
+            captured.update(json.loads(request_body.decode("utf-8")))
+            return json.dumps({"schema": BATCH_SCHEMA, "items": []}).encode("utf-8")
+
+        retriever = BridgeEvidenceRetriever(
+            endpoint="https://bridge.invalid/evidence",
+            transport=transport,
+        )
+        claim = "Esta alegação completa não deve atravessar o Bridge por padrão."
+        retriever.retrieve(claim_ref="claim://privacy", claim_text=claim)
+        self.assertNotIn("claim_text", captured)
+        self.assertEqual(
+            captured["claim_sha256"],
+            hashlib.sha256(" ".join(claim.split()).encode("utf-8")).hexdigest(),
+        )
+        self.assertTrue(captured["query_terms"])
+
+    def test_full_text_disclosure_is_explicit(self):
+        batch = {"schema": BATCH_SCHEMA, "items": []}
+        retriever = BridgeEvidenceRetriever(
+            endpoint="https://bridge.invalid/evidence",
+            query_disclosure="FULL_TEXT",
+            transport=self.transport_for(batch, expect_full_text=True),
+        )
+        retriever.retrieve(claim_ref="claim://1", claim_text="Full text is explicitly allowed here.")
+
     def test_maps_bridge_batch_to_source_document(self):
         observed = "O registro possui DOI 10.5281/zenodo.1."
-        import hashlib
         batch = {
             "schema": BATCH_SCHEMA,
             "evidence_hash": "evidence-1",
