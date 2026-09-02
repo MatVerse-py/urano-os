@@ -20,6 +20,7 @@ class ArgosPolicy:
     required_authority: Mapping[str, int] = field(default_factory=dict)
     block_on_conflict: bool = False
     allowed_producers: tuple[str, ...] = ()
+    pass_epistemic_states: tuple[str, ...] = ("SUPPORTED", "VERIFIED", "ADMISSIBLE")
     hold_epistemic_states: tuple[str, ...] = (
         "UNVERIFIED",
         "INSUFFICIENT_EVIDENCE",
@@ -30,6 +31,7 @@ class ArgosPolicy:
         "COORDINATION_SUSPECTED",
     )
     block_epistemic_states: tuple[str, ...] = ()
+    hold_unknown_epistemic_state: bool = True
 
 
 class Argos:
@@ -59,6 +61,7 @@ class Argos:
             )
 
         epistemic_state = envelope.epistemic_state.strip().upper()
+        pass_states = {state.strip().upper() for state in policy.pass_epistemic_states}
         block_states = {state.strip().upper() for state in policy.block_epistemic_states}
         hold_states = {state.strip().upper() for state in policy.hold_epistemic_states}
 
@@ -71,6 +74,12 @@ class Argos:
             )
         if epistemic_state and epistemic_state in hold_states:
             reasons.append(f"EPISTEMIC_STATE_HOLD:{epistemic_state}")
+        elif (
+            epistemic_state
+            and epistemic_state not in pass_states
+            and policy.hold_unknown_epistemic_state
+        ):
+            reasons.append(f"UNKNOWN_EPISTEMIC_STATE:{epistemic_state}")
 
         if policy.allowed_producers and envelope.producer not in policy.allowed_producers:
             reasons.append(f"PRODUCER_NOT_ALLOWED:{envelope.producer}")
