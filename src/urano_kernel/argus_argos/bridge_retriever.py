@@ -14,12 +14,14 @@ from hashlib import sha256
 from typing import Any, Callable, Mapping, Sequence
 from urllib import request
 import json
+import re
 
 from .source_intake import SourceDocument
 
 
 QUERY_SCHEMA = "matverse.argus-evidence-query.v1"
 BATCH_SCHEMA = "matverse.bridge-evidence-batch.v1"
+_QUERY_TOKEN_RE = re.compile(r"[A-Za-zÀ-ÖØ-öø-ÿ0-9_.:/-]{3,}")
 
 
 class BridgeProtocolError(RuntimeError):
@@ -43,31 +45,63 @@ def _clean_mapping(value: Any) -> dict[str, Any]:
     return dict(value) if isinstance(value, Mapping) else {}
 
 
+def _normalized_claim(value: str) -> str:
+    return " ".join(value.split())
+
+
+def _query_terms(value: str, *, limit: int = 64) -> tuple[str, ...]:
+    seen: set[str] = set()
+    terms: list[str] = []
+    for match in _QUERY_TOKEN_RE.finditer(value):
+        term = match.group(0).casefold()
+        if term in seen:
+            continue
+        seen.add(term)
+        terms.append(term)
+        if len(terms) >= limit:
+            break
+    return tuple(terms)
+
+
 @dataclass(frozen=True)
 class BridgeEvidenceRetriever:
     """Retrieve evidence from a Bridge-compatible evidence endpoint.
 
-    The endpoint receives a redacted claim query and returns a versioned batch.
-    `observed_text` is optional. Metadata-only items remain useful for structured
-    conflicts (DOI/version/status) but cannot become textual corroboration unless
-    the Bridge supplies an explicit, auditable `claim_relation`.
+    `query_disclosure="TERMS"` is the default: the Bridge receives a claim hash
+    plus deterministic search terms, not the full claim sentence. `FULL_TEXT`
+    is available only when an operator explicitly accepts that disclosure.
+
+    `observed_text` in responses is optional. Metadata-only items remain useful
+    for structured conflicts but cannot become textual corroboration unless the
+    Bridge supplies an explicit, auditable claim-scoped relation.
     """
 
     endpoint: str
     timeout: float = 15.0
     max_sources: int = 32
+    query_disclosure: str = "TERMS"
     headers: Mapping[str, str] = field(default_factory=dict)
     transport: Transport = _default_transport
 
     def _query(self, *, claim_ref: str, claim_text: str) -> Mapping[str, Any]:
         if not self.endpoint.strip():
             raise BridgeProtocolError("Bridge endpoint is required")
-        query = {
+
+        normalized = _normalized_claim(claim_text)
+        disclosure = self.query_disclosure.strip().upper()
+        if disclosure not in {"TERMS", "FULL_TEXT"}:
+            raise BridgeProtocolError(f"unsupported query disclosure mode: {self.query_disclosure!r}")
+
+        query: dict[str, Any] = {
             "schema": QUERY_SCHEMA,
             "claim_ref": claim_ref,
-            "claim_text": claim_text,
+            "claim_sha256": sha256(normalized.encode("utf-8")).hexdigest(),
+            "query_terms": list(_query_terms(normalized)),
             "max_sources": self.max_sources,
         }
+        if disclosure == "FULL_TEXT":
+            query["claim_text"] = normalized
+
         headers = {
             "Accept": "application/json",
             "Content-Type": "application/json",
