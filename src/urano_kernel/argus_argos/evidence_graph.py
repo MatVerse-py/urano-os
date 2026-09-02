@@ -147,6 +147,7 @@ class EvidenceComparator:
         if (
             relation is EvidenceRelation.NEUTRAL
             and metadata.get("claim_source") is not True
+            and metadata.get("bridge_metadata_only") is not True
             and claim_norm
             and claim_norm in text_norm
         ):
