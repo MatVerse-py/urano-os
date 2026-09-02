@@ -1,0 +1,16 @@
+{
+  "claim": "O registro externo confirma a versão declarada do artefato.",
+  "source_ref": "example://claim",
+  "include_claim_text": false,
+  "evidence": [
+    {
+      "path": "examples/evidence/record.html",
+      "representation": "SAVED_HTML",
+      "claim_relation": "SUPPORTS",
+      "evidence_root_id": "root://example-record",
+      "metadata": {
+        "note": "Synthetic example only; replace with a local corpus path when running the harness."
+      }
+    }
+  ]
+}
