@@ -134,6 +134,21 @@ class TestArgos(unittest.TestCase):
         self.assertEqual(verdict.state, GovernanceState.HOLD)
         self.assertIn("EPISTEMIC_STATE_HOLD:CONTRADICTORY", verdict.reasons)
 
+    def test_unknown_epistemic_state_holds_fail_closed(self):
+        verdict = self.argos.adjudicate(
+            self.envelope(
+                producer="CORPUS_AUDIT",
+                epistemic_state="P0_FAIL",
+                authority=PredicateAuthority(content=95, integrity=95),
+            ),
+            ArgosPolicy(
+                required_authority={"content": 70, "integrity": 80},
+                allowed_producers=("ARGUS", "CORPUS_AUDIT"),
+            ),
+        )
+        self.assertEqual(verdict.state, GovernanceState.HOLD)
+        self.assertIn("UNKNOWN_EPISTEMIC_STATE:P0_FAIL", verdict.reasons)
+
     def test_policy_can_hard_block_epistemic_state(self):
         verdict = self.argos.adjudicate(
             self.envelope(epistemic_state="FABRICATION_SUSPECTED"),
