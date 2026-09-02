@@ -165,8 +165,23 @@ class SourceIntake:
             parser.feed(text)
             for key, value in parser.metadata.items():
                 metadata.setdefault(key, value)
+
+            visible_parts: list[str] = []
             if parser.text_parts:
-                metadata.setdefault("rendered_text", " ".join(parser.text_parts))
+                rendered = " ".join(parser.text_parts)
+                metadata.setdefault("rendered_text", rendered)
+                visible_parts.append(rendered)
+
+            # Metadata descriptions often carry the archived page's factual
+            # assertion even when the body is JS-rendered or absent. Include
+            # each unique description once, preserving source wording.
+            for key in ("description", "og:description", "twitter:description"):
+                value = str(metadata.get(key) or "").strip()
+                if value and value not in visible_parts:
+                    visible_parts.append(value)
+
+            if visible_parts:
+                text = "\n".join(visible_parts)
 
         if representation in {"API_METADATA", "DOI_METADATA"}:
             try:
