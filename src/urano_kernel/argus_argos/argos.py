@@ -26,12 +26,14 @@ class ArgosPolicy:
         "INSUFFICIENT_EVIDENCE",
         "CONTRADICTORY",
         "OUT_OF_CONTEXT",
+        "INTEGRITY_CONFLICT",
         "MANIPULATION_SUSPECTED",
         "FABRICATION_SUSPECTED",
         "COORDINATION_SUSPECTED",
     )
     block_epistemic_states: tuple[str, ...] = ()
     hold_unknown_epistemic_state: bool = True
+    require_epistemic_state: bool = True
 
 
 class Argos:
@@ -65,20 +67,18 @@ class Argos:
         block_states = {state.strip().upper() for state in policy.block_epistemic_states}
         hold_states = {state.strip().upper() for state in policy.hold_epistemic_states}
 
-        if epistemic_state and epistemic_state in block_states:
+        if not epistemic_state and policy.require_epistemic_state:
+            reasons.append("MISSING_EPISTEMIC_STATE")
+        elif epistemic_state in block_states:
             return GovernanceDecision(
                 record_id=envelope.record_id,
                 state=GovernanceState.BLOCK,
                 reasons=(f"EPISTEMIC_STATE_BLOCK:{epistemic_state}",),
                 policy_id=policy.policy_id,
             )
-        if epistemic_state and epistemic_state in hold_states:
+        elif epistemic_state in hold_states:
             reasons.append(f"EPISTEMIC_STATE_HOLD:{epistemic_state}")
-        elif (
-            epistemic_state
-            and epistemic_state not in pass_states
-            and policy.hold_unknown_epistemic_state
-        ):
+        elif epistemic_state and epistemic_state not in pass_states and policy.hold_unknown_epistemic_state:
             reasons.append(f"UNKNOWN_EPISTEMIC_STATE:{epistemic_state}")
 
         if policy.allowed_producers and envelope.producer not in policy.allowed_producers:
