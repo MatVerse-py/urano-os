@@ -114,6 +114,35 @@ class TestBridgeEvidenceRetriever(unittest.TestCase):
         self.assertTrue(doc.metadata["bridge_metadata_only"])
         self.assertEqual(doc.metadata["bridge_source_content_hash"], "b" * 64)
 
+    def test_metadata_only_json_cannot_become_exact_text_support(self):
+        claim = "The official record states this exact sentence."
+        batch = {
+            "schema": BATCH_SCHEMA,
+            "evidence_hash": "evidence-meta",
+            "state": "PARTIAL",
+            "evidence_tier": "P2",
+            "items": [
+                {
+                    "locator": "saved://metadata-only.html",
+                    "representation": "SAVED_HTML",
+                    "source_content_hash": "d" * 64,
+                    "evidence_root_id": "root-meta",
+                    "independent": True,
+                    "metadata": {"title": claim},
+                }
+            ],
+        }
+        retriever = BridgeEvidenceRetriever(
+            endpoint="https://bridge.invalid/evidence",
+            transport=self.transport_for(batch),
+        )
+        result = ArgusPipeline(retriever=retriever).analyze_claim(
+            claim=ClaimCandidate("claim://meta", claim, "runtime://test", 1)
+        )
+        self.assertEqual(result.finding.finding_type.value, "INSUFFICIENT_EVIDENCE")
+        self.assertEqual(result.support_root_count, 0)
+        self.assertEqual(result.governance.state.value, "HOLD")
+
     def test_rejects_unknown_schema(self):
         retriever = BridgeEvidenceRetriever(
             endpoint="https://bridge.invalid/evidence",
