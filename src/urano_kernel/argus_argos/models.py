@@ -1,4 +1,8 @@
-"""Shared contracts for ARGUS perception and ARGOS adjudication."""
+"""Contracts for the ARGUS fake-news tool and ARGOS governance system.
+
+ARGUS and ARGOS are preserved as project labels. No acronym expansion is
+invented here.
+"""
 
 from dataclasses import dataclass, field
 from enum import Enum
@@ -38,35 +42,85 @@ class PredicateAuthority:
         return values
 
 
-@dataclass(frozen=True)
-class EvidenceObservation:
-    """Qualified observation produced by ARGUS.
+class ArgusFindingType(str, Enum):
+    """Conservative factual-integrity outcomes produced by ARGUS.
 
-    An observation records what was seen and the authority attached to that
-    representation. It is not itself an execution or publication decision.
+    These labels describe the state of the investigation. Suspicion labels are
+    not equivalent to a final assertion that content is false.
     """
 
-    observation_id: str
+    SUPPORTED = "SUPPORTED"
+    UNVERIFIED = "UNVERIFIED"
+    INSUFFICIENT_EVIDENCE = "INSUFFICIENT_EVIDENCE"
+    CONTRADICTORY = "CONTRADICTORY"
+    OUT_OF_CONTEXT = "OUT_OF_CONTEXT"
+    MANIPULATION_SUSPECTED = "MANIPULATION_SUSPECTED"
+    FABRICATION_SUSPECTED = "FABRICATION_SUSPECTED"
+    COORDINATION_SUSPECTED = "COORDINATION_SUSPECTED"
+
+
+@dataclass(frozen=True)
+class GovernanceEnvelope:
+    """Generic evidence input governed by ARGOS.
+
+    ARGOS accepts envelopes from ARGUS or any other laboratory/tool. This
+    prevents the governance system from being structurally coupled to the
+    fake-news tool.
+    """
+
+    record_id: str
+    producer: str
+    subject_ref: str
+    authority: PredicateAuthority
+    conflicts: Tuple[str, ...] = ()
+    metadata: Mapping[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class ArgusFinding:
+    """Finding from the ARGUS fake-news / factual-integrity tool."""
+
+    finding_id: str
+    claim_ref: str
     source_ref: str
     representation: str
     content_hash: str
+    finding_type: ArgusFindingType
     authority: PredicateAuthority
-    metadata: Mapping[str, Any] = field(default_factory=dict)
+    signals: Tuple[str, ...] = ()
     conflicts: Tuple[str, ...] = ()
+    metadata: Mapping[str, Any] = field(default_factory=dict)
     notes: Tuple[str, ...] = ()
 
+    def governance_envelope(self) -> GovernanceEnvelope:
+        return GovernanceEnvelope(
+            record_id=self.finding_id,
+            producer="ARGUS",
+            subject_ref=self.claim_ref,
+            authority=self.authority,
+            conflicts=self.conflicts,
+            metadata={
+                **dict(self.metadata),
+                "finding_type": self.finding_type.value,
+                "source_ref": self.source_ref,
+                "representation": self.representation,
+                "content_hash": self.content_hash,
+                "signals": self.signals,
+            },
+        )
 
-class AdjudicationState(str, Enum):
+
+class GovernanceState(str, Enum):
     PASS = "PASS"
     HOLD = "HOLD"
     BLOCK = "BLOCK"
 
 
 @dataclass(frozen=True)
-class Adjudication:
-    """Governed decision produced by ARGOS."""
+class GovernanceDecision:
+    """Policy decision produced by the ARGOS governance kernel."""
 
-    observation_id: str
-    state: AdjudicationState
+    record_id: str
+    state: GovernanceState
     reasons: Tuple[str, ...]
     policy_id: str
