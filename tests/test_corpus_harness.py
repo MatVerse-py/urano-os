@@ -51,7 +51,7 @@ class TestCorpusHarness(unittest.TestCase):
             with self.assertRaises(ValueError):
                 CorpusHarness().analyze_document(pdf)
 
-    def test_expected_hash_and_root_id_are_preserved_from_manifest(self):
+    def test_expected_hash_root_and_scope_binding_are_preserved_from_manifest(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "artifact.txt"
             path.write_text("artifact", encoding="utf-8")
@@ -60,12 +60,17 @@ class TestCorpusHarness(unittest.TestCase):
                     "path": str(path),
                     "expected_sha256": "0" * 64,
                     "evidence_root_id": "root://artifact",
+                    "claim_relation": "SUPPORTS",
+                    "relation_claim_ref": "claim://1",
+                    "relation_claim_sha256": "a" * 64,
                 }
             )
         self.assertEqual(source.expected_sha256, "0" * 64)
         self.assertEqual(source.evidence_root_id, "root://artifact")
+        self.assertEqual(source.metadata["relation_claim_ref"], "claim://1")
+        self.assertEqual(source.metadata["relation_claim_sha256"], "a" * 64)
 
-    def test_manifest_relation_can_be_explicit_without_changing_content(self):
+    def test_manifest_relation_can_be_explicit_for_single_claim(self):
         claim = "O registro confirma o evento declarado."
         with tempfile.TemporaryDirectory() as tmp:
             data = Path(tmp) / "record.json"
@@ -84,6 +89,32 @@ class TestCorpusHarness(unittest.TestCase):
             )
         self.assertEqual(report["results"][0]["finding_type"], "SUPPORTED")
         self.assertEqual(report["results"][0]["governance_state"], "PASS")
+
+    def test_unbound_relation_is_not_reused_across_document_claims(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            document = Path(tmp) / "document.txt"
+            document.write_text(
+                "Primeira afirmação declarativa suficientemente longa.\n"
+                "Segunda afirmação declarativa suficientemente longa.",
+                encoding="utf-8",
+            )
+            evidence = Path(tmp) / "evidence.json"
+            evidence.write_text('{"record": 1}', encoding="utf-8")
+            report = CorpusHarness().run_manifest(
+                {
+                    "document": str(document),
+                    "evidence": [
+                        {
+                            "path": str(evidence),
+                            "representation": "REPOSITORY_FILE",
+                            "claim_relation": "SUPPORTS",
+                        }
+                    ],
+                }
+            )
+        self.assertEqual(report["result_count"], 2)
+        self.assertTrue(all(row["support_root_count"] == 0 for row in report["results"]))
+        self.assertTrue(all(row["governance_state"] == "HOLD" for row in report["results"]))
 
 
 if __name__ == "__main__":
