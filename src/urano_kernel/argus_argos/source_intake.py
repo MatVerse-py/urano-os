@@ -46,9 +46,9 @@ NON_INDEPENDENT_REPRESENTATIONS = {"GENERATED_IMAGE", "DOCUMENT_PAGE_RENDER", "M
 class SourceDocument:
     """One source representation presented to ARGUS.
 
-    `expected_sha256` proves only byte equality when supplied by a trusted
-    upstream anchor. `evidence_root_id` may bind derivative representations to
-    a common evidence root; otherwise the content hash is the root key.
+    `expected_sha256` establishes byte equality against a declared digest. It
+    only becomes a high-authority integrity anchor when metadata explicitly says
+    that the digest anchor itself was independently verified.
     """
 
     locator: str
@@ -120,10 +120,16 @@ def authority_for(document: SourceDocument, *, tampered: bool) -> PredicateAutho
     metadata = dict(document.metadata)
 
     integrity = 0
+    anchor_verified = metadata.get("hash_anchor_verified") is True
     if document.expected_sha256 is not None:
-        integrity = 0 if tampered else 100
+        if tampered:
+            integrity = 0
+        else:
+            # Matching a caller-supplied digest proves consistency, not the
+            # provenance of the digest itself.
+            integrity = 100 if anchor_verified else 70
     elif metadata.get("hash_verified") is True:
-        integrity = 95
+        integrity = 95 if anchor_verified else 60
     elif metadata.get("content_hash_observed") is True:
         integrity = 40
 
@@ -172,9 +178,6 @@ class SourceIntake:
                 metadata.setdefault("rendered_text", rendered)
                 visible_parts.append(rendered)
 
-            # Metadata descriptions often carry the archived page's factual
-            # assertion even when the body is JS-rendered or absent. Include
-            # each unique description once, preserving source wording.
             for key in ("description", "og:description", "twitter:description"):
                 value = str(metadata.get(key) or "").strip()
                 if value and value not in visible_parts:
@@ -198,6 +201,11 @@ class SourceIntake:
 
         if tampered:
             signals.append("HASH_MISMATCH")
+        elif expected is not None:
+            if metadata.get("hash_anchor_verified") is True:
+                signals.append("HASH_MATCH_VERIFIED_ANCHOR")
+            else:
+                signals.append("HASH_MATCH_DECLARED_ANCHOR")
         if metadata.get("model_generated") is True or metadata.get("generated") is True:
             signals.append("GENERATED_REPRESENTATION")
 
