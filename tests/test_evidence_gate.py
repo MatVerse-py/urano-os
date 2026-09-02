@@ -26,6 +26,15 @@ class TestEvidenceGate(unittest.TestCase):
         self.assertFalse(verdict.passed)
         self.assertEqual(verdict.failed_gate, "CanPublish")
 
+    def test_blocks_inferred_claim_from_publish_even_when_bundle_is_anchored(self):
+        claims = [
+            Claim("trecho citado", EvidenceClass.OBSERVED_TEXT),
+            Claim("interpretação ainda não verificada", EvidenceClass.INFERRED),
+        ]
+        verdict = judge(claims)
+        self.assertFalse(verdict.passed)
+        self.assertEqual(verdict.failed_gate, "CanPublish")
+
     def test_passes_with_anchored_and_verifiable_claims(self):
         claims = [
             Claim("trecho citado", EvidenceClass.OBSERVED_TEXT),
@@ -50,6 +59,13 @@ class TestEvidencePackGate(unittest.TestCase):
     def test_seal_blocks_unverified_evidence_when_required(self):
         pack = EvidencePack("session-1")
         pack.add("source_a", {"x": 1})  # classe padrão: UNVERIFIED
+        with self.assertRaises(ValueError):
+            pack.seal(require_publishable=True)
+
+    def test_seal_blocks_inferred_evidence_when_required(self):
+        pack = EvidencePack("session-1")
+        pack.add("source_a", {"x": 1}, EvidenceClass.INFERRED)
+        self.assertFalse(pack.can_publish())
         with self.assertRaises(ValueError):
             pack.seal(require_publishable=True)
 
