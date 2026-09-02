@@ -127,9 +127,6 @@ def _redact_sensitive_spans(value: str) -> str:
 
 
 def _query_terms(value: str, *, limit: int = 64) -> tuple[str, ...]:
-    # TERMS mode is minimization, not anonymity. Obvious high-risk identifiers
-    # are removed before lexical discovery; operators needing stronger privacy
-    # can use HASH_ONLY.
     value = _redact_sensitive_spans(value)
     seen: set[str] = set()
     terms: list[str] = []
@@ -142,6 +139,12 @@ def _query_terms(value: str, *, limit: int = 64) -> tuple[str, ...]:
         if len(terms) >= limit:
             break
     return tuple(terms)
+
+
+def _scope_matches(item: Mapping[str, Any], *, claim_ref: str, claim_sha256: str) -> bool:
+    bound_ref = str(item.get("relation_claim_ref") or "").strip()
+    bound_hash = str(item.get("relation_claim_sha256") or "").strip().lower()
+    return bool((bound_ref and bound_ref == claim_ref) or (bound_hash and bound_hash == claim_sha256))
 
 
 @dataclass(frozen=True)
@@ -215,7 +218,14 @@ class BridgeEvidenceRetriever:
             raise BridgeProtocolError("Bridge batch must contain items[]")
         return payload
 
-    def _item_to_source(self, item: Mapping[str, Any], *, batch: Mapping[str, Any]) -> SourceDocument:
+    def _item_to_source(
+        self,
+        item: Mapping[str, Any],
+        *,
+        batch: Mapping[str, Any],
+        claim_ref: str,
+        claim_sha256: str,
+    ) -> SourceDocument:
         locator = str(item.get("locator") or "").strip()
         representation = str(item.get("representation") or "").strip().upper()
         if not locator or not representation:
@@ -237,12 +247,18 @@ class BridgeEvidenceRetriever:
             }
         )
 
-        # Claim-scoped controls are accepted only from top-level wire fields.
-        # Nested metadata is allowlisted above and cannot smuggle these values.
-        for key in ("claim_relation", "context_status", "integrity_status"):
+        scoped = _scope_matches(item, claim_ref=claim_ref, claim_sha256=claim_sha256)
+        for key in ("claim_relation", "context_status"):
             value = item.get(key)
             if value is not None and str(value).strip():
-                metadata[key] = str(value)[:256]
+                if scoped:
+                    metadata[key] = str(value)[:256]
+                else:
+                    metadata["bridge_unbound_claim_control_dropped"] = True
+
+        integrity_status = item.get("integrity_status")
+        if integrity_status is not None and str(integrity_status).strip():
+            metadata["integrity_status"] = str(integrity_status)[:256]
 
         generated = item.get("model_generated") is True or item.get("generated") is True
         if generated:
@@ -285,11 +301,20 @@ class BridgeEvidenceRetriever:
         )
 
     def retrieve(self, *, claim_ref: str, claim_text: str) -> Sequence[SourceDocument]:
+        normalized = _normalized_claim(claim_text)
+        claim_sha256 = sha256(normalized.encode("utf-8")).hexdigest()
         payload = self._query(claim_ref=claim_ref, claim_text=claim_text)
         items = payload["items"][: self.max_sources]
         sources: list[SourceDocument] = []
         for raw_item in items:
             if not isinstance(raw_item, Mapping):
                 raise BridgeProtocolError("Bridge items must be JSON objects")
-            sources.append(self._item_to_source(raw_item, batch=payload))
+            sources.append(
+                self._item_to_source(
+                    raw_item,
+                    batch=payload,
+                    claim_ref=claim_ref,
+                    claim_sha256=claim_sha256,
+                )
+            )
         return tuple(sources)
