@@ -126,6 +126,11 @@ class TestArgos(unittest.TestCase):
         )
         self.assertEqual(verdict.state, GovernanceState.PASS)
 
+    def test_default_policy_cannot_pass_without_authority_requirements(self):
+        verdict = self.argos.adjudicate(self.envelope())
+        self.assertEqual(verdict.state, GovernanceState.HOLD)
+        self.assertIn("MISSING_AUTHORITY_POLICY", verdict.reasons)
+
     def test_missing_epistemic_state_holds(self):
         verdict = self.argos.adjudicate(self.envelope(epistemic_state=""))
         self.assertEqual(verdict.state, GovernanceState.HOLD)
@@ -201,7 +206,10 @@ class TestArgos(unittest.TestCase):
     def test_argos_is_not_structurally_coupled_to_argus(self):
         verdict = self.argos.adjudicate(
             self.envelope(producer="MANDELA", epistemic_state="VERIFIED"),
-            ArgosPolicy(allowed_producers=("ARGUS", "MANDELA", "CARTOMANCIA")),
+            ArgosPolicy(
+                allowed_producers=("ARGUS", "MANDELA", "CARTOMANCIA"),
+                required_authority={"content": 70},
+            ),
         )
         self.assertEqual(verdict.state, GovernanceState.PASS)
 
