@@ -47,6 +47,43 @@ class TestBridgeEvidenceRetriever(unittest.TestCase):
         )
         self.assertTrue(captured["query_terms"])
 
+    def test_terms_mode_redacts_obvious_sensitive_identifiers(self):
+        captured = {}
+
+        def transport(url, request_body, headers, timeout):
+            captured.update(json.loads(request_body.decode("utf-8")))
+            return json.dumps({"schema": BATCH_SCHEMA, "items": []}).encode("utf-8")
+
+        claim = (
+            "Confirme o evento para mateus@example.com com UUID "
+            "550e8400-e29b-41d4-a716-446655440000 e segredo ghp_abcdefghijklmnopqrstuvwxyz."
+        )
+        BridgeEvidenceRetriever(
+            endpoint="https://bridge.invalid/evidence",
+            transport=transport,
+        ).retrieve(claim_ref="claim://privacy", claim_text=claim)
+        joined = " ".join(captured["query_terms"])
+        self.assertNotIn("mateus", joined)
+        self.assertNotIn("example.com", joined)
+        self.assertNotIn("550e8400", joined)
+        self.assertNotIn("ghp_", joined)
+        self.assertIn("confirme", joined)
+
+    def test_hash_only_mode_discloses_no_lexical_terms(self):
+        captured = {}
+
+        def transport(url, request_body, headers, timeout):
+            captured.update(json.loads(request_body.decode("utf-8")))
+            return json.dumps({"schema": BATCH_SCHEMA, "items": []}).encode("utf-8")
+
+        BridgeEvidenceRetriever(
+            endpoint="https://bridge.invalid/evidence",
+            query_disclosure="HASH_ONLY",
+            transport=transport,
+        ).retrieve(claim_ref="claim://hash-only", claim_text="Texto sensível para busca por hash.")
+        self.assertEqual(captured["query_terms"], [])
+        self.assertNotIn("claim_text", captured)
+
     def test_full_text_disclosure_is_explicit(self):
         batch = {"schema": BATCH_SCHEMA, "items": []}
         retriever = BridgeEvidenceRetriever(
@@ -73,6 +110,7 @@ class TestBridgeEvidenceRetriever(unittest.TestCase):
                     "evidence_root_id": "root-1",
                     "independent": True,
                     "claim_relation": "SUPPORTS",
+                    "relation_claim_ref": "claim://1",
                     "metadata": {"citation_doi": "10.5281/zenodo.1"},
                 }
             ],
@@ -87,6 +125,30 @@ class TestBridgeEvidenceRetriever(unittest.TestCase):
         self.assertEqual(docs[0].evidence_root_id, "root-1")
         self.assertEqual(docs[0].expected_sha256, batch["items"][0]["observed_text_sha256"])
         self.assertEqual(docs[0].metadata["bridge_evidence_state"], "VERIFIED_SNAPSHOT")
+        self.assertEqual(docs[0].metadata["claim_relation"], "SUPPORTS")
+
+    def test_unbound_claim_control_is_dropped_even_if_bridge_sends_it(self):
+        batch = {
+            "schema": BATCH_SCHEMA,
+            "items": [
+                {
+                    "locator": "api://record/1",
+                    "representation": "API_METADATA",
+                    "source_content_hash": "a" * 64,
+                    "evidence_root_id": "root-1",
+                    "independent": True,
+                    "claim_relation": "SUPPORTS",
+                    "metadata": {"claim_relation": "SUPPORTS", "title": "record"},
+                }
+            ],
+        }
+        retriever = BridgeEvidenceRetriever(
+            endpoint="https://bridge.invalid/evidence",
+            transport=self.transport_for(batch),
+        )
+        doc = retriever.retrieve(claim_ref="claim://1", claim_text="A factual claim for testing.")[0]
+        self.assertNotIn("claim_relation", doc.metadata)
+        self.assertTrue(doc.metadata["bridge_unbound_claim_control_dropped"])
 
     def test_metadata_only_does_not_pretend_source_bytes_were_transferred(self):
         batch = {
@@ -151,7 +213,19 @@ class TestBridgeEvidenceRetriever(unittest.TestCase):
         with self.assertRaises(BridgeProtocolError):
             retriever.retrieve(claim_ref="claim://1", claim_text="claim")
 
-    def test_pipeline_uses_bridge_relation_without_bypassing_authority_policy(self):
+    def test_rejects_invalid_endpoint_and_oversized_response(self):
+        with self.assertRaises(BridgeProtocolError):
+            BridgeEvidenceRetriever(endpoint="file:///tmp/evidence")
+
+        retriever = BridgeEvidenceRetriever(
+            endpoint="https://bridge.invalid/evidence",
+            max_response_bytes=1024,
+            transport=lambda *_: b"x" * 1025,
+        )
+        with self.assertRaises(BridgeProtocolError):
+            retriever.retrieve(claim_ref="claim://1", claim_text="claim")
+
+    def test_pipeline_uses_bound_bridge_relation_without_bypassing_authority_policy(self):
         batch = {
             "schema": BATCH_SCHEMA,
             "evidence_hash": "evidence-3",
@@ -165,6 +239,7 @@ class TestBridgeEvidenceRetriever(unittest.TestCase):
                     "evidence_root_id": "root-api",
                     "independent": True,
                     "claim_relation": "SUPPORTS",
+                    "relation_claim_ref": "claim://1",
                     "metadata": {"title": "official record"},
                 }
             ],
