@@ -9,6 +9,7 @@ on:
       - 'tests/test_argus_argos*.py'
       - 'tests/test_urano_argus_runtime.py'
       - 'tests/test_corpus_harness.py'
+      - 'tests/test_bridge_retriever.py'
       - 'examples/argus_corpus_manifest.example.json'
       - 'examples/evidence/**'
       - 'ARGUS_ARGOS_ARCHITECTURE_V0.md'
@@ -29,13 +30,14 @@ jobs:
           python-version: '3.11'
       - name: Compile
         run: python -m compileall -q src tests
-      - name: ARGUS-ARGOS unit, pipeline, runtime and corpus tests
+      - name: ARGUS-ARGOS unit, pipeline, runtime, corpus and Bridge tests
         run: >-
           python -m unittest
           tests.test_argus_argos
           tests.test_argus_pipeline
           tests.test_urano_argus_runtime
           tests.test_corpus_harness
+          tests.test_bridge_retriever
           -v
       - name: Corpus harness CLI smoke
         run: |
