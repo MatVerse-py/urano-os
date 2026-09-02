@@ -58,9 +58,10 @@ def _max_authority(values: Iterable[PredicateAuthority]) -> PredicateAuthority:
 class EvidenceRootIndex:
     """Deduplicate derivative/duplicate representations by evidence root.
 
-    Different files or renderings do not become independent corroborators merely
-    because they exist as separate representations. Authority is aggregated by
-    maximum per predicate domain, never by additive voting.
+    A root cannot launder properties across representations. A derivative
+    SUPPORTS link does not borrow independence from a neutral parent, and a
+    high-authority neutral representation does not lend authority to a weaker
+    representation that actually supports or contradicts the claim.
     """
 
     def __init__(self, links: Iterable[EvidenceLink] = ()) -> None:
@@ -69,19 +70,23 @@ class EvidenceRootIndex:
     def add(self, link: EvidenceLink) -> None:
         self._links.append(link)
 
-    def summaries(self) -> tuple[EvidenceRootSummary, ...]:
+    def _grouped(self) -> dict[str, list[EvidenceLink]]:
         grouped: dict[str, list[EvidenceLink]] = {}
         for link in self._links:
             grouped.setdefault(link.root_id, []).append(link)
+        return grouped
 
+    def summaries(self) -> tuple[EvidenceRootSummary, ...]:
+        grouped = self._grouped()
         summaries: list[EvidenceRootSummary] = []
         for root_id in sorted(grouped):
             links = grouped[root_id]
+            independent_links = [link for link in links if link.independent]
             summaries.append(
                 EvidenceRootSummary(
                     root_id=root_id,
-                    independent=any(link.independent for link in links),
-                    authority=_max_authority(link.authority for link in links),
+                    independent=bool(independent_links),
+                    authority=_max_authority(link.authority for link in independent_links),
                     relations=tuple(sorted({link.relation for link in links}, key=lambda item: item.value)),
                     source_refs=tuple(sorted({link.source_ref for link in links})),
                     signals=tuple(sorted({signal for link in links for signal in link.signals})),
@@ -91,13 +96,29 @@ class EvidenceRootIndex:
         return tuple(summaries)
 
     def independent_roots(self, relation: EvidenceRelation | None = None) -> tuple[EvidenceRootSummary, ...]:
-        roots = self.summaries()
-        if relation is None:
-            return tuple(root for root in roots if root.independent)
-        return tuple(root for root in roots if root.independent and relation in root.relations)
+        grouped = self._grouped()
+        eligible_root_ids: set[str] = set()
+        for root_id, links in grouped.items():
+            for link in links:
+                if not link.independent:
+                    continue
+                if relation is None or link.relation is relation:
+                    eligible_root_ids.add(root_id)
+                    break
+        return tuple(root for root in self.summaries() if root.root_id in eligible_root_ids)
 
-    def aggregate_authority(self) -> PredicateAuthority:
-        return _max_authority(root.authority for root in self.independent_roots())
+    def aggregate_authority(self, relation: EvidenceRelation | None = None) -> PredicateAuthority:
+        """Aggregate authority only from independent links relevant to a finding."""
+        per_root: list[PredicateAuthority] = []
+        for links in self._grouped().values():
+            eligible = [
+                link.authority
+                for link in links
+                if link.independent and (relation is None or link.relation is relation)
+            ]
+            if eligible:
+                per_root.append(_max_authority(eligible))
+        return _max_authority(per_root)
 
     def conflicts(self) -> tuple[str, ...]:
         return tuple(sorted({conflict for root in self.summaries() for conflict in root.conflicts}))
@@ -162,8 +183,6 @@ class EvidenceComparator:
             signals.append("STRUCTURED_METADATA_CONFLICT:DOI_PRESENT_VS_PENDING_PROSE")
             conflicts.append("DOI_PRESENT_VS_PENDING_PROSE")
 
-        # Adapter-supplied integrity/media signals are treated as observations,
-        # not as autonomous proof that media is fabricated.
         integrity_status = str(metadata.get("integrity_status") or "").strip().upper()
         if integrity_status in {"MISMATCH", "TAMPERED", "INVALID"}:
             relation = EvidenceRelation.INTEGRITY_WARNING
