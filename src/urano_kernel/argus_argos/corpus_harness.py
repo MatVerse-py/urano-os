@@ -78,10 +78,16 @@ def load_source(spec: str | Path | Mapping[str, Any]) -> SourceDocument:
         metadata["context_status"] = str(data["context_status"])
     if data.get("integrity_status"):
         metadata["integrity_status"] = str(data["integrity_status"])
+    if data.get("relation_claim_ref"):
+        metadata["relation_claim_ref"] = str(data["relation_claim_ref"])
+    if data.get("relation_claim_sha256"):
+        metadata["relation_claim_sha256"] = str(data["relation_claim_sha256"]).lower()
     if data.get("model_generated") is True:
         metadata["model_generated"] = True
     if data.get("derived_representation") is True:
         metadata["derived_representation"] = True
+    if data.get("hash_anchor_verified") is True:
+        metadata["hash_anchor_verified"] = True
 
     return SourceDocument(
         locator=str(data.get("locator") or path.resolve()),
