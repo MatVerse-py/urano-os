@@ -3,7 +3,12 @@
 import json
 import unittest
 
-from src.urano_kernel.kernel import UranoKernel
+from src.urano_kernel.kernel import (
+    MAX_ARGUS_CLAIM_CHARS,
+    MAX_ARGUS_EVIDENCE_ITEMS,
+    MAX_ARGUS_SOURCE_BYTES,
+    UranoKernel,
+)
 
 
 class TestUranoArgusRuntime(unittest.TestCase):
@@ -71,6 +76,74 @@ class TestUranoArgusRuntime(unittest.TestCase):
         result = self.kernel.runtime.emit(
             "argus_case",
             {"claim": "Alegação válida para teste.", "evidence": ["not-an-object"]},
+        )
+        self.assertEqual(result["governance_state"], "BLOCK")
+        self.assertIn("MALFORMED_EVIDENCE", result["governance_reasons"])
+
+    def test_oversized_claim_blocks_before_pipeline(self):
+        result = self.kernel.runtime.emit(
+            "argus_case",
+            {"claim": "x" * (MAX_ARGUS_CLAIM_CHARS + 1)},
+        )
+        self.assertEqual(result["governance_state"], "BLOCK")
+        self.assertIn("ARGUS_INPUT_LIMIT_EXCEEDED", result["governance_reasons"])
+
+    def test_too_many_evidence_items_blocks(self):
+        evidence = [
+            {"locator": f"text://{index}", "representation": "CORPUS_COPY", "content": "small"}
+            for index in range(MAX_ARGUS_EVIDENCE_ITEMS + 1)
+        ]
+        result = self.kernel.runtime.emit(
+            "argus_case",
+            {"claim": "Alegação suficientemente longa para teste.", "evidence": evidence},
+        )
+        self.assertEqual(result["governance_state"], "BLOCK")
+        self.assertIn("ARGUS_INPUT_LIMIT_EXCEEDED", result["governance_reasons"])
+
+    def test_oversized_source_blocks(self):
+        result = self.kernel.runtime.emit(
+            "argus_case",
+            {
+                "claim": "Alegação suficientemente longa para teste.",
+                "evidence": [
+                    {
+                        "locator": "text://large",
+                        "representation": "CORPUS_COPY",
+                        "content": "x" * (MAX_ARGUS_SOURCE_BYTES + 1),
+                    }
+                ],
+            },
+        )
+        self.assertEqual(result["governance_state"], "BLOCK")
+        self.assertIn("MALFORMED_EVIDENCE", result["governance_reasons"])
+
+    def test_binary_document_cannot_be_claim_source_without_extracted_text(self):
+        result = self.kernel.runtime.emit(
+            "argus_document",
+            {
+                "document": {
+                    "locator": "file://paper.pdf",
+                    "representation": "SAVED_PDF",
+                    "content": b"%PDF-1.7 binary",
+                }
+            },
+        )
+        self.assertEqual(result["governance_state"], "BLOCK")
+        self.assertIn("BINARY_DOCUMENT_REQUIRES_EXTRACTED_TEXT", result["governance_reasons"])
+
+    def test_non_json_shaped_source_content_is_rejected(self):
+        result = self.kernel.runtime.emit(
+            "argus_case",
+            {
+                "claim": "Alegação suficientemente longa para teste.",
+                "evidence": [
+                    {
+                        "locator": "object://invalid",
+                        "representation": "CORPUS_COPY",
+                        "content": {"nested": "object"},
+                    }
+                ],
+            },
         )
         self.assertEqual(result["governance_state"], "BLOCK")
         self.assertIn("MALFORMED_EVIDENCE", result["governance_reasons"])
