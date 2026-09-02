@@ -65,13 +65,15 @@ class GovernanceEnvelope:
 
     ARGOS accepts envelopes from ARGUS or any other laboratory/tool. This
     prevents the governance system from being structurally coupled to the
-    fake-news tool.
+    fake-news tool. `epistemic_state` is explicit so governance cannot be
+    bypassed by assigning high numeric authority to an unresolved finding.
     """
 
     record_id: str
     producer: str
     subject_ref: str
     authority: PredicateAuthority
+    epistemic_state: str = ""
     conflicts: Tuple[str, ...] = ()
     metadata: Mapping[str, Any] = field(default_factory=dict)
 
@@ -98,6 +100,7 @@ class ArgusFinding:
             producer="ARGUS",
             subject_ref=self.claim_ref,
             authority=self.authority,
+            epistemic_state=self.finding_type.value,
             conflicts=self.conflicts,
             metadata={
                 **dict(self.metadata),
