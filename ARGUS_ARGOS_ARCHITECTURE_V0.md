@@ -218,11 +218,48 @@ Raw claim/evidence content is therefore not duplicated into URANO operational me
 
 Malformed ARGUS runtime payloads fail closed as `BLOCK` summaries.
 
+## GPT-Project-Bridge retriever integration
+
+`BridgeEvidenceRetriever` implements the ARGUS `EvidenceRetriever` protocol over a versioned wire contract:
+
+- query: `matverse.argus-evidence-query.v1`;
+- response: `matverse.bridge-evidence-batch.v1`.
+
+The retriever can use HTTP or an injected transport for offline/replay tests. It maps Bridge evidence into local `SourceDocument` objects while preserving:
+
+- representation class;
+- source-content hash as provenance;
+- explicit evidence-root id;
+- generated/derivative status;
+- bounded metadata;
+- optional explicit claim relation/context/integrity signals;
+- optional observed text with its own SHA-256 commitment.
+
+The adapter deliberately does **not** trust a remote scalar/authority value as local truth. `SourceIntake` recalculates authority from the representation class under URANO policy.
+
+Metadata-only evidence never pretends that original source bytes crossed the interface. If observed text is omitted, the original source hash remains provenance only; it is not compared against a synthetic payload.
+
+An explicit Bridge relation such as `SUPPORTS` controls the semantic relation, but not ARGOS admissibility. Example:
+
+```text
+Bridge relation = SUPPORTS
+API_METADATA content authority = 25
+ARGOS content threshold = 50
+→ ARGUS SUPPORTED
+→ ARGOS HOLD (AUTHORITY_BELOW_THRESHOLD:content)
+```
+
+Bridge transport/protocol failure is not interpreted as a false claim. In the URANO runtime it produces `HOLD / BRIDGE_RETRIEVAL_UNAVAILABLE`.
+
+The corresponding Bridge exporter is `app/source_exchange.py` in `Gpt-project-bridge`, which emits the same response schema and never exports raw source text implicitly.
+
+A deployed discovery/catalog/search endpoint is still a replaceable adapter boundary: the client contract and evidence exchange are implemented, while the choice of web search, local catalog, institutional database or other discovery service remains external to the epistemic kernel.
+
 ## Related components
 
 - `ARGUS Connect`: user-facing intake / explorer / review interface; not the ARGUS analytical core and not ARGOS itself.
 - `ARGOS Agent`: backend/executor for jobs, models, hashing, APIs and automations; not the full ARGOS governance system.
-- `GPT-Project-Bridge`: source acquisition/resolution/interoperability layer. It should supply governed representations and resolved metadata to ARGUS rather than being duplicated inside URANO.
+- `GPT-Project-Bridge`: source acquisition/resolution/interoperability layer. It supplies governed representations and resolved metadata to ARGUS through the versioned evidence exchange contract.
 - `Evidence Gate` / `Ω-Gate`: downstream enforcement mechanisms; ARGOS is broader than either individual gate.
 
 ## Boundaries
@@ -237,6 +274,7 @@ Malformed ARGUS runtime payloads fail closed as `BLOCK` summaries.
 - `EvidenceRoot != RepresentationCount`.
 - `HighAuthority != VerifiedEpistemicState`.
 - `GeneratedRepresentation != IndependentEvidence`.
+- `BridgeSupports != ArgosPass`.
 
 ## Validation status
 
@@ -254,6 +292,7 @@ The implementation is covered by CI for:
 - end-to-end ARGUS → ARGOS pipeline;
 - URANO runtime integration and payload redaction;
 - local CorpusHarness behavior;
+- Bridge wire-contract mapping and protocol failure;
 - full repository regression suite.
 
 These tests validate software behavior, not the truth of arbitrary external claims. External verification quality still depends on the evidence and adapters supplied to the pipeline.
@@ -262,4 +301,4 @@ These tests validate software behavior, not the truth of arbitrary external clai
 
 This PR remains independent of PR #4 (`evidence_gate`) to avoid stacked-branch coupling. After PR #4 lands, a follow-up should map `GovernanceDecision` into that gate contract rather than duplicating gate semantics.
 
-Live web/Bridge/deepfake retrieval remains an adapter boundary. The core is intentionally usable offline and fail-closed when no independent evidence is supplied.
+The Bridge evidence client/export contract is implemented. Live discovery remains modular so the core is usable offline and fail-closed when no independent evidence is available.
