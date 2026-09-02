@@ -10,15 +10,26 @@ from .models import GovernanceDecision, GovernanceEnvelope, GovernanceState
 class ArgosPolicy:
     """Fail-closed governance policy.
 
-    required_authority maps predicate domains to minimum policy weights.
-    Missing or sub-threshold authority keeps a record in HOLD. ARGOS accepts
-    records from ARGUS and from other MatVerse laboratories/tools.
+    `required_authority` maps predicate domains to minimum policy weights.
+    Missing or sub-threshold authority keeps a record in HOLD. Epistemic state
+    is evaluated separately from numeric authority so an unresolved finding
+    cannot become admissible merely by carrying high weights.
     """
 
     policy_id: str = "argos.governance.default.v0"
     required_authority: Mapping[str, int] = field(default_factory=dict)
     block_on_conflict: bool = False
     allowed_producers: tuple[str, ...] = ()
+    hold_epistemic_states: tuple[str, ...] = (
+        "UNVERIFIED",
+        "INSUFFICIENT_EVIDENCE",
+        "CONTRADICTORY",
+        "OUT_OF_CONTEXT",
+        "MANIPULATION_SUSPECTED",
+        "FABRICATION_SUSPECTED",
+        "COORDINATION_SUSPECTED",
+    )
+    block_epistemic_states: tuple[str, ...] = ()
 
 
 class Argos:
@@ -46,6 +57,20 @@ class Argos:
                 reasons=("MALFORMED_GOVERNANCE_ENVELOPE",),
                 policy_id=policy.policy_id,
             )
+
+        epistemic_state = envelope.epistemic_state.strip().upper()
+        block_states = {state.strip().upper() for state in policy.block_epistemic_states}
+        hold_states = {state.strip().upper() for state in policy.hold_epistemic_states}
+
+        if epistemic_state and epistemic_state in block_states:
+            return GovernanceDecision(
+                record_id=envelope.record_id,
+                state=GovernanceState.BLOCK,
+                reasons=(f"EPISTEMIC_STATE_BLOCK:{epistemic_state}",),
+                policy_id=policy.policy_id,
+            )
+        if epistemic_state and epistemic_state in hold_states:
+            reasons.append(f"EPISTEMIC_STATE_HOLD:{epistemic_state}")
 
         if policy.allowed_producers and envelope.producer not in policy.allowed_producers:
             reasons.append(f"PRODUCER_NOT_ALLOWED:{envelope.producer}")
