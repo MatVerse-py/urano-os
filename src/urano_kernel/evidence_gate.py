@@ -26,8 +26,13 @@ VERIFIABLE = {
     EvidenceClass.COMPUTED,
 }
 
-# Subconjunto de VERIFIABLE que pode ancorar a existência de uma alegação
-# (COMPUTED sozinho não basta: um cálculo sobre nada ainda é nada).
+# Classes que podem sair do portão como evidência publicável. INFERRED e
+# UNVERIFIED continuam preservadas internamente, mas não podem ser promovidas
+# silenciosamente a prova.
+PUBLISHABLE = frozenset(VERIFIABLE)
+
+# Subconjunto de VERIFIABLE que pode ancorar a existência de um conjunto de
+# alegações. COMPUTED sozinho não basta: um cálculo sobre nada ainda é nada.
 ANCHORING = {
     EvidenceClass.OBSERVED_TEXT,
     EvidenceClass.FILE_READ,
@@ -54,13 +59,13 @@ GatePredicate = Callable[[list], bool]
 
 
 def _can_exist(claims: list) -> bool:
-    """Ao menos uma alegação precisa estar ancorada em evidência direta."""
+    """O conjunto só existe se houver ao menos uma âncora direta."""
     return any(c.evidence_class in ANCHORING for c in claims)
 
 
 def _can_publish(claims: list) -> bool:
-    """Nenhuma alegação UNVERIFIED pode sair do portão como se fosse fato."""
-    return all(c.evidence_class is not EvidenceClass.UNVERIFIED for c in claims)
+    """Toda alegação publicada deve possuir classe mecanicamente verificável."""
+    return all(c.evidence_class in PUBLISHABLE for c in claims)
 
 
 # Sequência estrita: a ordem importa (CanExist antes de CanPublish).
