@@ -4,7 +4,7 @@ import hashlib
 import unittest
 
 from src.urano_kernel.argus_argos import ArgusFindingType, GovernanceState
-from src.urano_kernel.argus_argos.pipeline import ArgusPipeline, ClaimCandidate, PipelinePolicy
+from src.urano_kernel.argus_argos.pipeline import ArgusPipeline, ClaimCandidate
 from src.urano_kernel.argus_argos.source_intake import SourceDocument
 
 
@@ -74,6 +74,46 @@ class TestArgusPipeline(unittest.TestCase):
         self.assertEqual(result.independent_root_count, 1)
         self.assertEqual(result.support_root_count, 1)
 
+    def test_derivative_support_cannot_borrow_independence_from_neutral_parent(self):
+        claim = self.claim()
+        parent = SourceDocument(
+            locator="document://paper.pdf",
+            representation="SAVED_PDF",
+            content="Documento independente, mas sem a alegação em análise.",
+            evidence_root_id="root://paper",
+        )
+        derivative = SourceDocument(
+            locator="image://annotation.png",
+            representation="SAVED_IMAGE",
+            content=b"annotation",
+            evidence_root_id="root://paper",
+            metadata={"derived_representation": True, "claim_relation": "SUPPORTS"},
+        )
+        result = self.pipeline.analyze_claim(claim=claim, evidence=(parent, derivative))
+        self.assertEqual(result.independent_root_count, 1)
+        self.assertEqual(result.support_root_count, 0)
+        self.assertEqual(result.finding.finding_type, ArgusFindingType.INSUFFICIENT_EVIDENCE)
+        self.assertEqual(result.governance.state, GovernanceState.HOLD)
+
+    def test_neutral_high_authority_source_cannot_boost_weak_support(self):
+        claim = self.claim("O registro externo confirma a publicação declarada.")
+        weak_support = SourceDocument(
+            locator="api://record/1",
+            representation="API_METADATA",
+            content='{"id": 1}',
+            metadata={"claim_relation": "SUPPORTS"},
+        )
+        strong_but_neutral = SourceDocument(
+            locator="repo://paper.tex",
+            representation="LATEX_SOURCE",
+            content="Texto independente sem relação com a alegação consultada.",
+        )
+        result = self.pipeline.analyze_claim(claim=claim, evidence=(weak_support, strong_but_neutral))
+        self.assertEqual(result.finding.finding_type, ArgusFindingType.SUPPORTED)
+        self.assertEqual(result.finding.authority.content, 25)
+        self.assertEqual(result.governance.state, GovernanceState.HOLD)
+        self.assertIn("AUTHORITY_BELOW_THRESHOLD:content", result.governance.reasons)
+
     def test_generated_image_never_becomes_independent_support(self):
         claim = self.claim()
         evidence = SourceDocument(
@@ -101,7 +141,7 @@ class TestArgusPipeline(unittest.TestCase):
         self.assertIn("HASH_MISMATCH", result.finding.conflicts)
         self.assertEqual(result.governance.state, GovernanceState.HOLD)
 
-    def test_matching_expected_hash_contributes_integrity_authority(self):
+    def test_matching_declared_hash_is_not_maximum_integrity_authority(self):
         claim = self.claim()
         digest = hashlib.sha256(claim.text.encode("utf-8")).hexdigest()
         evidence = SourceDocument(
@@ -111,8 +151,23 @@ class TestArgusPipeline(unittest.TestCase):
             expected_sha256=digest,
         )
         result = self.pipeline.analyze_claim(claim=claim, evidence=(evidence,))
-        self.assertEqual(result.finding.authority.integrity, 100)
+        self.assertEqual(result.finding.authority.integrity, 70)
+        self.assertIn("HASH_MATCH_DECLARED_ANCHOR", result.finding.signals)
         self.assertEqual(result.finding.finding_type, ArgusFindingType.SUPPORTED)
+
+    def test_verified_hash_anchor_can_reach_maximum_integrity_authority(self):
+        claim = self.claim()
+        digest = hashlib.sha256(claim.text.encode("utf-8")).hexdigest()
+        evidence = SourceDocument(
+            locator="file://artifact.txt",
+            representation="REPOSITORY_FILE",
+            content=claim.text,
+            expected_sha256=digest,
+            metadata={"hash_anchor_verified": True},
+        )
+        result = self.pipeline.analyze_claim(claim=claim, evidence=(evidence,))
+        self.assertEqual(result.finding.authority.integrity, 100)
+        self.assertIn("HASH_MATCH_VERIFIED_ANCHOR", result.finding.signals)
 
     def test_context_signal_holds_out_of_context(self):
         claim = self.claim("A frase foi apresentada com seu contexto original completo.")
@@ -158,8 +213,6 @@ class TestArgusPipeline(unittest.TestCase):
         result = self.pipeline.analyze_claim(claim=claim, evidence=(evidence,))
         self.assertEqual(result.finding.finding_type, ArgusFindingType.SUPPORTED)
         self.assertEqual(result.governance.state, GovernanceState.HOLD)
-        # API metadata is strong for publication, but weak for claim-content;
-        # the default policy requires content>=50, preventing scalar authority leak.
         self.assertIn("AUTHORITY_BELOW_THRESHOLD:content", result.governance.reasons)
 
     def test_no_evidence_is_unverified_and_holds(self):
