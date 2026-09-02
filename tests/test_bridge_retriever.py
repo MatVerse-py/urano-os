@@ -88,7 +88,7 @@ class TestBridgeEvidenceRetriever(unittest.TestCase):
         with self.assertRaises(BridgeProtocolError):
             retriever.retrieve(claim_ref="claim://1", claim_text="claim")
 
-    def test_pipeline_uses_bridge_relation(self):
+    def test_pipeline_uses_bridge_relation_without_bypassing_authority_policy(self):
         batch = {
             "schema": BATCH_SCHEMA,
             "evidence_hash": "evidence-3",
@@ -114,7 +114,8 @@ class TestBridgeEvidenceRetriever(unittest.TestCase):
             claim=ClaimCandidate("claim://1", "A sufficiently long factual claim.", "runtime://test", 1)
         )
         self.assertEqual(result.finding.finding_type.value, "SUPPORTED")
-        self.assertEqual(result.governance.state.value, "PASS")
+        self.assertEqual(result.governance.state.value, "HOLD")
+        self.assertIn("AUTHORITY_BELOW_THRESHOLD:content", result.governance.reasons)
 
     def test_urano_holds_when_bridge_unavailable(self):
         def failing_transport(url, request_body, headers, timeout):
