@@ -157,6 +157,15 @@ class ArgusPipeline:
             return ArgusFindingType.INSUFFICIENT_EVIDENCE
         return ArgusFindingType.UNVERIFIED
 
+    @staticmethod
+    def _authority_relation_for(finding_type: ArgusFindingType) -> EvidenceRelation | None:
+        return {
+            ArgusFindingType.SUPPORTED: EvidenceRelation.SUPPORTS,
+            ArgusFindingType.CONTRADICTORY: EvidenceRelation.CONTRADICTS,
+            ArgusFindingType.OUT_OF_CONTEXT: EvidenceRelation.CONTEXTUALIZES,
+            ArgusFindingType.INTEGRITY_CONFLICT: EvidenceRelation.INTEGRITY_WARNING,
+        }.get(finding_type)
+
     def analyze_claim(
         self,
         *,
@@ -180,7 +189,7 @@ class ArgusPipeline:
             index,
             min_support=self.policy.min_independent_support_roots,
         )
-        authority = index.aggregate_authority()
+        authority = index.aggregate_authority(self._authority_relation_for(finding_type))
         signals = list(index.signals())
         conflicts = list(index.conflicts())
 
