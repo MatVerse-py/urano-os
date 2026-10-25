@@ -1,7 +1,7 @@
 # Prancha MatVerse Runtime — contrato de apresentação viva v0.2 (proposta)
 
 **Status:** SPEC_CANDIDATE / DEMO_ONLY · **Data:** 2026-10-25  
-**Escopo deste PR:** documentação e contrato demonstrativo. Não altera kernel, Memory Gate, Cassandra Gate, assinaturas, políticas ou APIs existentes.
+**Escopo deste PR:** documentação, perfil demonstrativo e verificações isoladas desse perfil. Não altera kernel, Memory Gate, Cassandra Gate, assinaturas, políticas ou APIs existentes.
 
 ## Objetivo
 
@@ -27,7 +27,23 @@ A apresentação não decide autorização nem comprova experimentos por si só.
 
 ## Contrato mínimo de cena
 
-Ver `docs/examples/prancha-scene-demo.v1.json`. Campos críticos: `scene_id`, `source_ref`, `status`, `claims`, `evidence_refs`, `narration`, `content`, `authority`. `status=DEMO_ONLY` implica evidência não operacional. `release_receipt=null` não equivale a aprovação.
+Ver [exemplo](examples/prancha-scene-demo.v1.json) e [esquema demonstrativo](schemas/prancha-scene-demo.v1.schema.json). Campos críticos: `scene_id`, `source_ref`, `status`, `claims`, `claims[*].evidence_refs`, `narration`, `content`, `authority`. `status=DEMO_ONLY` implica evidência não operacional. `authority.release_receipt_ref=null` não equivale a aprovação.
+
+O perfil local aceita `HYPOTHESIS` (hipótese), `HOLD` (pendência) e `DEMO` (ilustração) nos claims. São estados distintos; nenhum é convertido em FATO ou autorização. Exige `may_execute=false`, referências Gate/receipt nulas, dados sintéticos e evidências vazias. `HYPOTHESIS` permanece no exemplo; não é um sinônimo de HOLD.
+
+O validador `tools/prancha_demo.py` rejeita campos desconhecidos em todos os objetos, chaves JSON duplicadas, tipos incorretos, versões não suportadas, fontes fora do namespace fictício, claims repetidos, payloads acima de 65.536 bytes e profundidade superior a 16. Aplica somente os keywords usados pelo esquema incluído; não é um motor JSON Schema geral e rejeita keywords desconhecidos. Não importa nem chama o kernel.
+
+### Compatibilidade explícita de versões
+
+| Objeto | Versão | O que foi verificado |
+|---|---|---|
+| Contrato documental | v0.2 / candidato | Fronteiras e perfil demonstrativo |
+| Exemplo de cena | `matverse.prancha.scene.v1-demo`, `version=0.2.0` | Validação do perfil local e casos negativos |
+| HTML independente | v0.1 | Hash, sintaxe e inspeção estática; QA em navegador HOLD |
+| Exportação atual do HTML | `matverse.prancha.presentation.v0.1-demo` | Formato legado, **não** validado pelo perfil de cena |
+| Exportação ScientificObject | `matverse.scientific_object.demo.v0.1` | JSON ilustrativo, **não** RO-Crate nem receipt |
+
+Não há adaptador automático entre o manifesto de apresentação e o de cena. O CI do exemplo não valida a exportação do HTML. Ver [matriz de saída de HOLD](PRANCHA_HOLD_EXIT_MATRIX.md) para a publicação demonstrativa e os requisitos operacionais que permanecem pendentes.
 
 ## Fluxo proposto de plugins
 
