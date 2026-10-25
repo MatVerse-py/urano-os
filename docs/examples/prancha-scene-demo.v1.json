@@ -1,0 +1,37 @@
+{
+  "schema": "matverse.prancha.scene.v1-demo",
+  "scene_id": "symbiopet-lua-groomcare-001",
+  "presentation_id": "symbiopet-demo-20261025",
+  "version": "0.2.0",
+  "status": "DEMO_ONLY",
+  "source_ref": "urn:matverse:case:symbiopet:fictional-lua",
+  "narration": {
+    "lang": "pt-BR",
+    "asset_ref": null,
+    "transcript": "Lua recebe um cuidado registrado. A observação é ilustrativa e não constitui diagnóstico."
+  },
+  "content": {
+    "title": "Um cuidado que não se perde",
+    "audience": "lavinia",
+    "mode": "narrative",
+    "pet_id": "lua-fictional"
+  },
+  "claims": [
+    {
+      "id": "C01",
+      "text": "Registros de cuidados podem ser organizados ao longo do tempo.",
+      "status": "HYPOTHESIS",
+      "evidence_refs": []
+    }
+  ],
+  "authority": {
+    "gate_decision_ref": null,
+    "release_receipt_ref": null,
+    "may_execute": false
+  },
+  "provenance": {
+    "generator": "Prancha MatVerse demonstrativa",
+    "review_status": "HOLD",
+    "synthetic_data": true
+  }
+}

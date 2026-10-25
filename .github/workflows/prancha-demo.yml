@@ -1,0 +1,45 @@
+name: Prancha demo profile
+
+on:
+  pull_request:
+    paths:
+      - 'docs/**'
+      - 'tools/prancha_demo.py'
+      - 'tools/audit_prancha_artifact.py'
+      - 'tests/test_prancha_demo.py'
+      - '.github/workflows/prancha-demo.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  demo-profile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout without persistent credentials or submodules
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          submodules: false
+      - name: Preserve kernel and canonical contracts in this demo PR
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: git diff --exit-code "$BASE_SHA" HEAD -- src/urano_kernel contracts .gitmodules
+      - name: Verify demo profile and negative cases
+        run: |
+          python3 -m unittest discover -s tests -p 'test_prancha_demo.py' -v
+          python3 tools/prancha_demo.py docs/examples/prancha-scene-demo.v1.json
+          python3 -m py_compile tools/audit_prancha_artifact.py
+      - name: State the limits of this check
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<'SUMMARY'
+          Profile validation only: SPEC_CANDIDATE / DEMO_ONLY.
+          This job does not receive or test the standalone HTML/media artifact.
+          Browser QA, physical devices, accessibility, media rights, deployment,
+          backend authorization and scientific validation remain HOLD.
+          No deployment or production release is performed by this workflow.
+          SUMMARY
